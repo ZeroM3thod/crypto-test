@@ -1,0 +1,12 @@
+on the /community/chat here all is ok just remove all mock data and add real data from database and backend . and on this page here keep the community rules exact same to same and on the user and admin avater here show the real avater from database and backend and on the username here show the user frist name and _ Last name frist letters and on the text input area here if the user enter @ and type the userid or name then he can see all user and tag them on chat and on the every massage side show 3 dot and from here other user and reply on this exact massage and also can copy this pmassage and also report on this massage .    
+
+
+
+on the /admin/community here admin can do all the on the chat section here admin can sends massage as admin and from the selection place here admin can selected the user name or add new user name . and send massage as like user . and admin can pin any massage and and also admin delete any massage  and also ban also delete any massage and also admin can unban any user . and when admin ban any user and delete any massage then write a reason then on the massage here show the reason . 
+
+on the script chat here show the all script chat here admin can add new script and also Paste text here admin can paste the text ([HH:MM] username: message) and also admin can run the script and then the massage auto show on the chat to all users . 
+
+on the lock button here admin can lock and unlock the chat for all users and on the rules here admin can edit and remove the rules and also add new rules .
+
+on the member section here admin admin can unban the ban user on the online user list real and from here show real onlined user from backend . and from the edit count button here admin can edit the online user count and here on the custom number admin add it show to all users and also on the this number auto change like 5 increase after 3 sec and dicres after 2 sec like this . and also add a download the chat jason file . 
+and on this file here keep the all chat data from database and backend . in a stracter and it i input in the lib/db/ folder and thise chats data are delete after then and show all data in /community/chat from this json file . (this trick for database cost dicrease)- and plan it fully in smart way .

@@ -1,0 +1,21 @@
+import { cn } from "@/lib/utils";
+import type { WalletAccount } from "./types";
+import { diceBearGlassUrl } from "./utils";
+
+export function AccountAvatar({
+  account,
+  className,
+}: {
+  account: WalletAccount | undefined;
+  className?: string;
+}) {
+  if (!account) return null;
+  if (account.avatar) return <>{account.avatar}</>;
+  return (
+    <img
+      src={diceBearGlassUrl(account.id || account.address)}
+      alt={account.name}
+      className={cn("h-7 w-7 shrink-0 rounded-full bg-muted", className)}
+    />
+  );
+}

@@ -1,0 +1,292 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+:root {
+  --background: #151515;
+  --foreground: #ededed;
+  --border: #2a2a2a;
+  --muted: #1f1f1f;
+  --muted-foreground: #a1a1aa;
+  --ring: #60a5fa;
+  --primary: #60a5fa;
+  --card: #1c1c1c;
+  --destructive: #ef4444;
+  --success: #4ade80;
+  --warning: #f59e0b;
+  --chart-bg: #1c1c1c;
+  --chart-fg: #71717a;
+  --chart-grid: rgba(255, 255, 255, 0.06);
+}
+
+html.dark,
+:root[data-theme="dark"] {
+  --background: #151515;
+  --foreground: #ededed;
+  --border: #2a2a2a;
+  --muted: #1f1f1f;
+  --muted-foreground: #a1a1aa;
+  --ring: #60a5fa;
+  --primary: #60a5fa;
+  --card: #1c1c1c;
+  --destructive: #ef4444;
+  --success: #4ade80;
+  --warning: #f59e0b;
+  --chart-bg: #1c1c1c;
+  --chart-fg: #71717a;
+  --chart-grid: rgba(255, 255, 255, 0.06);
+}
+
+html.light,
+:root[data-theme="light"] {
+  --background: #f8fafc;
+  --foreground: #09090b;
+  --border: #e4e4e7;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --ring: #2563eb;
+  --primary: #2563eb;
+  --card: #ffffff;
+  --destructive: #ef4444;
+  --success: #16a34a;
+  --warning: #d97706;
+  --chart-bg: #ffffff;
+  --chart-fg: #71717a;
+  --chart-grid: rgba(0, 0, 0, 0.06);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-card: var(--card);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  --breakpoint-xs: 480px;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans, Arial, Helvetica, sans-serif);
+}
+
+/* =====================================================================
+   QOUANTEX LANDING PAGE: design tokens
+   Everything is scoped to the .qx wrapper so the rest of the app
+   (signin, dashboard, admin...) keeps its current colours.
+   ===================================================================== */
+
+/* Light palette (copied 1:1 from the HTML) */
+.qx {
+  --c-surface-container: 238 238 238;
+  --c-secondary-fixed: 228 226 226;
+  --c-inverse-on-surface: 240 241 241;
+  --c-surface-tint: 95 94 94;
+  --c-on-tertiary-fixed: 7 0 108;
+  --c-on-surface: 26 28 28;
+  --c-on-tertiary-fixed-variant: 47 46 190;
+  --c-on-error: 255 255 255;
+  --c-surface-container-highest: 226 226 226;
+  --c-surface-container-high: 232 232 232;
+  --c-tertiary: 21 21 21;
+  --c-on-secondary-container: 98 98 98;
+  --c-secondary-fixed-dim: 199 198 198;
+  --c-on-secondary-fixed-variant: 70 71 71;
+  --c-on-primary: 255 255 255;
+  --c-on-surface-variant: 68 71 72;
+  --c-tertiary-fixed-dim: 192 193 255;
+  --c-on-background: 26 28 28;
+  --c-on-primary-fixed-variant: 71 70 70;
+  --c-primary-fixed-dim: 200 198 197;
+  --c-on-tertiary-container: 112 115 255;
+  --c-outline: 116 120 120;
+  --c-on-secondary: 255 255 255;
+  --c-primary-fixed: 229 226 225;
+  --c-on-error-container: 147 0 10;
+  --c-on-primary-container: 133 131 131;
+  --c-primary-container: 28 27 27;
+  --c-on-tertiary: 255 255 255;
+  --c-inverse-surface: 47 49 49;
+  --c-on-primary-fixed: 28 27 27;
+  --c-secondary-container: 225 223 223;
+  --c-background: 249 249 249;
+  --c-surface-container-lowest: 255 255 255;
+  --c-error: 186 26 26;
+  --c-secondary: 94 94 94;
+  --c-tertiary-container: 7 0 108;
+  --c-outline-variant: 196 199 199;
+  --c-surface-dim: 218 218 218;
+  --c-surface: 249 249 249;
+  --c-tertiary-fixed: 225 224 255;
+  --c-error-container: 255 218 214;
+  --c-surface-bright: 249 249 249;
+  --c-primary: 21 21 21;
+  --c-surface-variant: 226 226 226;
+  --c-inverse-primary: 200 198 197;
+  --c-surface-container-low: 243 243 243;
+  --c-on-secondary-fixed: 27 28 28;
+
+  /* Your app already has a `primary` colour (blue). Inside .qx ONLY,
+     point it at the landing page's primary (near-black / near-white). */
+  --primary: rgb(var(--c-primary));
+
+  transition: background-color 0.2s, color 0.2s;
+}
+
+/* Dark palette: your root layout puts the `dark` class on <html> */
+.dark .qx {
+  --c-surface: 21 21 21;
+  --c-background: 21 21 21;
+  --c-surface-dim: 21 21 21;
+  --c-surface-bright: 27 27 27;
+  --c-surface-container-lowest: 15 15 15;
+  --c-surface-container-low: 27 27 27;
+  --c-surface-container: 33 33 33;
+  --c-surface-container-high: 42 42 42;
+  --c-surface-container-highest: 51 51 51;
+  --c-surface-variant: 46 46 46;
+  --c-on-surface: 236 236 236;
+  --c-on-background: 236 236 236;
+  --c-on-surface-variant: 196 199 199;
+  --c-outline: 142 145 146;
+  --c-outline-variant: 58 61 61;
+  --c-primary: 242 242 242;
+  --c-on-primary: 21 21 21;
+  --c-tertiary: 242 242 242;
+  --c-on-tertiary: 21 21 21;
+  --c-inverse-surface: 236 236 236;
+  --c-inverse-on-surface: 21 21 21;
+  --c-secondary: 199 198 198;
+  --c-surface-tint: 200 198 197;
+}
+
+/* The old tailwind.config → Tailwind v4 theme.
+   `primary` and `background` are intentionally NOT redefined here
+   (they already exist in your app). */
+@theme inline {
+  --color-surface-container: rgb(var(--c-surface-container));
+  --color-secondary-fixed: rgb(var(--c-secondary-fixed));
+  --color-inverse-on-surface: rgb(var(--c-inverse-on-surface));
+  --color-surface-tint: rgb(var(--c-surface-tint));
+  --color-on-tertiary-fixed: rgb(var(--c-on-tertiary-fixed));
+  --color-on-surface: rgb(var(--c-on-surface));
+  --color-on-tertiary-fixed-variant: rgb(var(--c-on-tertiary-fixed-variant));
+  --color-on-error: rgb(var(--c-on-error));
+  --color-surface-container-highest: rgb(var(--c-surface-container-highest));
+  --color-surface-container-high: rgb(var(--c-surface-container-high));
+  --color-tertiary: rgb(var(--c-tertiary));
+  --color-on-secondary-container: rgb(var(--c-on-secondary-container));
+  --color-secondary-fixed-dim: rgb(var(--c-secondary-fixed-dim));
+  --color-on-secondary-fixed-variant: rgb(var(--c-on-secondary-fixed-variant));
+  --color-on-primary: rgb(var(--c-on-primary));
+  --color-on-surface-variant: rgb(var(--c-on-surface-variant));
+  --color-tertiary-fixed-dim: rgb(var(--c-tertiary-fixed-dim));
+  --color-on-background: rgb(var(--c-on-background));
+  --color-on-primary-fixed-variant: rgb(var(--c-on-primary-fixed-variant));
+  --color-primary-fixed-dim: rgb(var(--c-primary-fixed-dim));
+  --color-on-tertiary-container: rgb(var(--c-on-tertiary-container));
+  --color-outline: rgb(var(--c-outline));
+  --color-on-secondary: rgb(var(--c-on-secondary));
+  --color-primary-fixed: rgb(var(--c-primary-fixed));
+  --color-on-error-container: rgb(var(--c-on-error-container));
+  --color-on-primary-container: rgb(var(--c-on-primary-container));
+  --color-primary-container: rgb(var(--c-primary-container));
+  --color-on-tertiary: rgb(var(--c-on-tertiary));
+  --color-inverse-surface: rgb(var(--c-inverse-surface));
+  --color-on-primary-fixed: rgb(var(--c-on-primary-fixed));
+  --color-secondary-container: rgb(var(--c-secondary-container));
+  --color-surface-container-lowest: rgb(var(--c-surface-container-lowest));
+  --color-error: rgb(var(--c-error));
+  --color-secondary: rgb(var(--c-secondary));
+  --color-tertiary-container: rgb(var(--c-tertiary-container));
+  --color-outline-variant: rgb(var(--c-outline-variant));
+  --color-surface-dim: rgb(var(--c-surface-dim));
+  --color-surface: rgb(var(--c-surface));
+  --color-tertiary-fixed: rgb(var(--c-tertiary-fixed));
+  --color-error-container: rgb(var(--c-error-container));
+  --color-surface-bright: rgb(var(--c-surface-bright));
+  --color-surface-variant: rgb(var(--c-surface-variant));
+  --color-inverse-primary: rgb(var(--c-inverse-primary));
+  --color-surface-container-low: rgb(var(--c-surface-container-low));
+  --color-on-secondary-fixed: rgb(var(--c-on-secondary-fixed));
+
+  /* Fonts: reuses the Geist you already load with next/font */
+  --font-body: var(--font-geist-sans), "Inter", sans-serif;
+  --font-h1: var(--font-geist-sans), "Inter", sans-serif;
+  --font-h2: var(--font-geist-sans), "Inter", sans-serif;
+  --font-h3: var(--font-geist-sans), "Inter", sans-serif;
+  --font-button: var(--font-geist-sans), "Inter", sans-serif;
+  --font-label-caps: var(--font-geist-sans), "Inter", sans-serif;
+
+  /* Type scale: text-body, text-h1, text-h2, text-h3, text-button, text-label-caps */
+  --text-body: 17px;
+  --text-body--line-height: 1.6;
+  --text-body--letter-spacing: 0em;
+  --text-body--font-weight: 400;
+
+  --text-h3: 28px;
+  --text-h3--line-height: 1.2;
+  --text-h3--letter-spacing: -0.01em;
+  --text-h3--font-weight: 500;
+
+  --text-button: 14px;
+  --text-button--line-height: 1;
+  --text-button--letter-spacing: 0.01em;
+  --text-button--font-weight: 500;
+
+  --text-label-caps: 12px;
+  --text-label-caps--line-height: 1;
+  --text-label-caps--letter-spacing: 0.05em;
+  --text-label-caps--font-weight: 600;
+
+  --text-h1: 84px;
+  --text-h1--line-height: 0.95;
+  --text-h1--letter-spacing: -0.04em;
+  --text-h1--font-weight: 600;
+
+  --text-h2: 48px;
+  --text-h2--line-height: 1.1;
+  --text-h2--letter-spacing: -0.02em;
+  --text-h2--font-weight: 600;
+}
+
+/* Material Symbols icon class.
+   Own class name (qx-icon) on purpose: Google's stylesheet ships an
+   un-layered .material-symbols-outlined { font-size: 24px } that would
+   beat Tailwind v4's layered utilities (text-4xl, text-[20px]...). */
+@layer components {
+  .qx-icon {
+    font-family: "Material Symbols Outlined";
+    font-weight: normal;
+    font-style: normal;
+    font-size: 24px;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    font-feature-settings: "liga";
+    -webkit-font-smoothing: antialiased;
+    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  }
+  .qx-icon-filled {
+    font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24;
+  }
+}
+
+/* Tailwind v4 buttons default to the arrow cursor; v3 (the HTML) used a pointer */
+@layer base {
+  .qx button:not(:disabled) {
+    cursor: pointer;
+  }
+}
