@@ -152,9 +152,9 @@ export function UserDetail({
       if (!res.ok) throw new Error(String(res.status));
       const { token } = await res.json();
       
-      // Set session token and redirect to user dashboard
+      // Set session token and redirect to user dashboard (bypasses password/2FA)
       document.cookie = `session_token=${token}; path=/; max-age=2592000`;
-      window.location.href = '/dashboard';
+      window.location.href = '/dashboard'; // ponytail: user lands on their own dashboard, not owner's
     } catch (err: any) {
       flash(err.message || "Login as user failed");
     } finally {
