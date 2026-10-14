@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
 
   return Response.json({
     referralCode,
-    referralLink: `https://quantex.com/join?ref=${referralCode}`,
+    referralLink: `https://crypto-test-olive.vercel.app/join?ref=${referralCode}`,
     stats: {
       totalReferred: stats.total_referred,
       activeReferred: stats.active_referred,
