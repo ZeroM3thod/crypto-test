@@ -94,8 +94,8 @@ const ROUTES: Record<string, string> = {
   "Fund History": "/fund/history",
   // Referral
   
-  "Referral Dashboard": "/referral/dashboard",
-  "Leaderboard":       "/referral/leaderboard",
+  "Referral": "/referral/dashboard",
+ 
 
   // Support
   "Support":        "/support/create-ticket",
@@ -142,10 +142,7 @@ const destinations = [
   {
     label: "Referral",
     icon: Users,
-    children: [
-      "Referral Dashboard",
-      "Leaderboard",
-          ],
+   
   },
   {
     label: "Support",
