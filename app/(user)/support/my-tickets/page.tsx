@@ -22,7 +22,8 @@ interface TicketMessage {
   id: string;
   message: string;
   created_at: string;
-  sender: { first_name: string; last_name: string; role: "user" | "admin" };
+  // "user" | "admin" | "owner" | ... — anything that is not "user" is treated as staff
+  sender: { first_name: string; last_name: string; role: string };
 }
 
 interface Ticket {
@@ -48,7 +49,9 @@ function formatDate(s: string) {
   return new Date(s).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 function formatTime(s: string) {
-  return new Date(s).toLocaleString("en-GB", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).replace(",", "");
+  return new Date(s)
+    .toLocaleString("en-GB", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })
+    .replace(",", "");
 }
 
 // ── Page ─────────────────────────────────────────────────────────────────
@@ -60,18 +63,26 @@ export default function MyTicketsPage() {
   const [loading, setLoading] = useState(true);
 
   const chatMessagesRef = useRef<HTMLDivElement>(null);
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const activeTicket = tickets.find((t) => t.id === activeTicketId) || null;
 
+  const scrollToBottom = () => {
+    requestAnimationFrame(() => {
+      if (chatMessagesRef.current) {
+        chatMessagesRef.current.scrollTop = chatMessagesRef.current.scrollHeight;
+      }
+    });
+  };
+
   const fetchTickets = async () => {
     try {
-      const res = await fetch('/api/support/my-tickets');
+      const res = await fetch("/api/support/my-tickets");
       if (!res.ok) return;
       const data = await res.json();
       setTickets(data.tickets || []);
     } catch (error) {
-      console.error('Fetch tickets error:', error);
+      console.error("Fetch tickets error:", error);
     } finally {
       setLoading(false);
     }
@@ -82,26 +93,28 @@ export default function MyTicketsPage() {
       const res = await fetch(`/api/support/ticket?ticketId=${ticketId}`);
       if (!res.ok) return;
       const data = await res.json();
-      
-      setTickets(prev => prev.map(t => 
-        t.id === ticketId 
-          ? { 
-              ...t, 
-              messages: data.messages.map((m: any) => ({
-                id: m.id,
-                message: m.message,
-                created_at: m.created_at,
-                sender: {
-                  first_name: m.sender.role === 'user' ? 'You' : m.sender.first_name,
-                  last_name: m.sender.role === 'user' ? '' : m.sender.last_name,
-                  role: m.sender.role
-                }
-              }))
-            }
-          : t
-      ));
+
+      setTickets((prev) =>
+        prev.map((t) =>
+          t.id === ticketId
+            ? {
+                ...t,
+                messages: (data.messages || []).map((m: any) => ({
+                  id: m.id,
+                  message: m.message,
+                  created_at: m.created_at,
+                  sender: {
+                    first_name: m.sender?.role === "user" ? "You" : m.sender?.first_name || "Support",
+                    last_name: m.sender?.role === "user" ? "" : m.sender?.last_name || "",
+                    role: m.sender?.role || "admin",
+                  },
+                })),
+              }
+            : t
+        )
+      );
     } catch (error) {
-      console.error('Fetch ticket details error:', error);
+      console.error("Fetch ticket details error:", error);
     }
   };
 
@@ -109,14 +122,14 @@ export default function MyTicketsPage() {
     fetchTickets();
   }, []);
 
+  // Poll the open ticket every 3s
   useEffect(() => {
-    if (activeTicketId && activeTicket) {
+    if (!activeTicketId) return;
+
+    fetchTicketDetails(activeTicketId);
+    pollingRef.current = setInterval(() => {
       fetchTicketDetails(activeTicketId);
-      
-      pollingRef.current = setInterval(() => {
-        fetchTicketDetails(activeTicketId);
-      }, 3000);
-    }
+    }, 3000);
 
     return () => {
       if (pollingRef.current) {
@@ -126,6 +139,11 @@ export default function MyTicketsPage() {
     };
   }, [activeTicketId]);
 
+  // Auto-scroll when a new message arrives or a ticket is opened
+  useEffect(() => {
+    scrollToBottom();
+  }, [activeTicketId, activeTicket?.messages?.length]);
+
   const sendChat = async () => {
     if (!chatInput.trim() || !activeTicketId || !activeTicket) return;
     if (activeTicket.status === "closed") return;
@@ -134,28 +152,27 @@ export default function MyTicketsPage() {
     setChatInput("");
 
     try {
-      const res = await fetch('/api/support/ticket', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/support/ticket", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ticketId: activeTicketId,
-          message: msgText
-        })
+          message: msgText,
+        }),
       });
 
       if (!res.ok) {
-        alert('Failed to send message');
+        setChatInput(msgText); // restore so the user doesn't lose their text
+        alert("Failed to send message");
         return;
       }
 
       await fetchTicketDetails(activeTicketId);
-
-      requestAnimationFrame(() => {
-        if (chatMessagesRef.current) chatMessagesRef.current.scrollTop = chatMessagesRef.current.scrollHeight;
-      });
+      scrollToBottom();
     } catch (error) {
-      console.error('Send message error:', error);
-      alert('Failed to send message');
+      console.error("Send message error:", error);
+      setChatInput(msgText);
+      alert("Failed to send message");
     }
   };
 
@@ -254,19 +271,39 @@ export default function MyTicketsPage() {
                       <p className="py-8 text-center text-sm text-muted-foreground">No messages yet.</p>
                     ) : (
                       activeTicket.messages.map((m) => {
-                        const isAdmin = m.sender.role === "admin";
-                        const initials = ((m.sender.first_name[0] || "") + (m.sender.last_name[0] || "")).toUpperCase() || "?";
+                        // user = LEFT, anyone else (admin / owner / staff) = RIGHT
+                        const isUser = m.sender.role === "user";
+                        const isStaff = !isUser;
+                        const initials =
+                          ((m.sender.first_name?.[0] || "") + (m.sender.last_name?.[0] || "")).toUpperCase() || "?";
+
                         return (
-                          <div key={m.id} className={`flex max-w-[85%] items-end gap-2 ${isAdmin ? "ml-auto flex-row-reverse self-end" : "self-start"}`}>
-                            <div className={`grid size-6 shrink-0 place-items-center rounded-full border text-[10px] font-semibold ${isAdmin ? "border-foreground bg-foreground text-background" : "border-border"}`}>
+                          <div
+                            key={m.id}
+                            className={`flex max-w-[85%] items-end gap-2 ${
+                              isStaff ? "ml-auto flex-row-reverse self-end" : "mr-auto self-start"
+                            }`}
+                          >
+                            <div
+                              className={`grid size-6 shrink-0 place-items-center rounded-full border text-[10px] font-semibold ${
+                                isStaff ? "border-foreground bg-foreground text-background" : "border-border"
+                              }`}
+                            >
                               {initials}
                             </div>
-                            <div>
-                              <div className={`rounded-lg px-3 py-2 text-sm leading-relaxed ${isAdmin ? "rounded-br-sm bg-foreground text-background" : "rounded-bl-sm border border-border"}`}>
+                            <div className="min-w-0">
+                              <div
+                                className={`break-words rounded-lg px-3 py-2 text-sm leading-relaxed ${
+                                  isStaff
+                                    ? "rounded-br-sm bg-foreground text-background"
+                                    : "rounded-bl-sm border border-border"
+                                }`}
+                              >
                                 {m.message}
                               </div>
-                              <p className={`mt-1 text-[10px] text-muted-foreground ${isAdmin ? "text-right" : ""}`}>
-                                {formatTime(m.created_at)}{isAdmin ? ` · ${m.sender.first_name} ${m.sender.last_name}` : ""}
+                              <p className={`mt-1 text-[10px] text-muted-foreground ${isStaff ? "text-right" : "text-left"}`}>
+                                {formatTime(m.created_at)}
+                                {isStaff ? ` · ${m.sender.first_name} ${m.sender.last_name}`.trimEnd() : ""}
                               </p>
                             </div>
                           </div>
