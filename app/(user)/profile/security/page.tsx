@@ -328,10 +328,10 @@ function TwoFAModal({
 
   return (
     <div
-      className="fixed inset-0 z-[900] flex items-end justify-center bg-foreground/20 backdrop-blur-sm sm:items-center"
+      className="fixed inset-0 z-[900] flex items-end justify-center overflow-y-auto bg-foreground/20 backdrop-blur-sm sm:items-center sm:p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="w-full max-w-md rounded-t-4xl border border-border bg-card p-6 sm:rounded-4xl">
+      <div className="max-h-[92dvh] w-full max-w-md overflow-y-auto overscroll-contain rounded-t-4xl border border-border bg-card p-5 sm:max-h-[90dvh] sm:rounded-4xl sm:p-6">
         <div className="mb-6 flex items-center justify-between">
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Security</p>
@@ -409,29 +409,43 @@ function TwoFAModal({
             </ol>
 
             {/* QR + Secret */}
-            <div className="mb-5 flex flex-col items-center gap-4 sm:flex-row sm:items-start">
-              <div className="flex size-[140px] shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-border bg-muted/40">
-                {qr ? <img src={qr} alt="2FA QR code" className="size-full" /> : <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                  <QrCode className="size-10" />
-                  <span className="text-[10px] uppercase tracking-wide">Scan QR code</span>
-                </div>}
+            <div className="mb-5 flex flex-col items-center gap-4">
+              {/* QR code — always on a white tile so it scans in light & dark mode */}
+              <div className="flex size-48 shrink-0 items-center justify-center rounded-2xl border border-border bg-white p-3 shadow-sm">
+                {qr ? (
+                  <img
+                    src={qr}
+                    alt="2FA QR code"
+                    className="size-full object-contain"
+                    style={{ imageRendering: "pixelated" }}
+                  />
+                ) : (
+                  <div className="flex flex-col items-center gap-2 text-neutral-400">
+                    <QrCode className="size-12" />
+                    <span className="text-[10px] font-medium uppercase tracking-wide">Scan QR code</span>
+                  </div>
+                )}
               </div>
-              <div className="flex-1 space-y-3">
+
+              {/* Secret key */}
+              <div className="w-full min-w-0 space-y-3">
                 <div>
                   <Label>Secret Key (manual entry)</Label>
                   <div className="flex items-center gap-2 rounded-2xl border border-border bg-muted/30 p-2.5">
-                    <span className="flex-1 font-mono text-xs text-foreground tracking-widest">
+                    <span className="min-w-0 flex-1 select-all break-all font-mono text-xs leading-relaxed tracking-wider text-foreground">
                       {secret || "Generate first"}
                     </span>
                     <button
-                      onClick={() => navigator.clipboard?.writeText(secret)}
-                      className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:text-foreground"
+                      type="button"
+                      aria-label="Copy secret key"
+                      onClick={() => secret && navigator.clipboard?.writeText(secret)}
+                      className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:text-foreground"
                     >
                       <Copy className="size-3.5" />
                     </button>
                   </div>
                 </div>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
                   Store this key safely. You will need it to recover access if you lose your phone.
                 </p>
               </div>
