@@ -26,38 +26,45 @@ const ASSETS: { id: Asset; name: string; symbol: string }[] = [
   { id: "USDC", name: "USD Coin", symbol: "$" },
 ];
 
-const ADDRESSES: Record<Asset, Record<Network, string>> = {
+const ADMIN_ADDRESSES: Record<Asset, Record<Network, string>> = {
   USDT: {
-    BEP20: "0xa73e4002d2bd14f11b6637934ca5ae9af7c7c0e7",
-    ERC20: "0xa73e4002d2bd14f11b6637934ca5ae9af7c7c0e7",
-    Aptos: "0xa73e4002d2bd14f11b6637934ca5ae9af7c7c0e7",
-    Polygon_POS: "0xa73e4002d2bd14f11b6637934ca5ae9af7c7c0e7",
-    Solana: "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM",
+    BEP20: process.env.NEXT_PUBLIC_ADMIN_USDT_BEP20 || "",
+    ERC20: process.env.NEXT_PUBLIC_ADMIN_USDT_ERC20 || "",
+    Aptos: process.env.NEXT_PUBLIC_ADMIN_USDT_APTOS || "",
+    Polygon_POS: process.env.NEXT_PUBLIC_ADMIN_USDT_POLYGON_POS || "",
+    Solana: process.env.NEXT_PUBLIC_ADMIN_USDT_SOLANA || "",
   },
   USDC: {
-    BEP20: "0xa73e4002d2bd14f11b6637934ca5ae9af7c7c0e7",
-    ERC20: "0xa73e4002d2bd14f11b6637934ca5ae9af7c7c0e7",
-    Aptos: "0xa73e4002d2bd14f11b6637934ca5ae9af7c7c0e7",
-    Polygon_POS: "0xa73e4002d2bd14f11b6637934ca5ae9af7c7c0e7",
-    Solana: "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM",
+    BEP20: process.env.NEXT_PUBLIC_ADMIN_USDC_BEP20 || "",
+    ERC20: process.env.NEXT_PUBLIC_ADMIN_USDC_ERC20 || "",
+    Aptos: process.env.NEXT_PUBLIC_ADMIN_USDC_APTOS || "",
+    Polygon_POS: process.env.NEXT_PUBLIC_ADMIN_USDC_POLYGON_POS || "",
+    Solana: process.env.NEXT_PUBLIC_ADMIN_USDC_SOLANA || "",
   },
 };
 
-const QR_IMAGES: Record<Asset, Record<Network, string>> = {
+const OWNER_ADDRESSES: Record<Asset, Record<Network, string>> = {
   USDT: {
-    BEP20: "/qr/usdt-bep20.png",
-    ERC20: "/qr/usdt-erc20.png",
-    Aptos: "/qr/usdt-aptos.png",
-    Polygon_POS: "/qr/usdt-polygon.png",
-    Solana: "/qr/usdt-solana.png",
+    BEP20: process.env.NEXT_PUBLIC_OWNER_USDT_BEP20 || "",
+    ERC20: process.env.NEXT_PUBLIC_OWNER_USDT_ERC20 || "",
+    Aptos: process.env.NEXT_PUBLIC_OWNER_USDT_APTOS || "",
+    Polygon_POS: process.env.NEXT_PUBLIC_OWNER_USDT_POLYGON_POS || "",
+    Solana: process.env.NEXT_PUBLIC_OWNER_USDT_SOLANA || "",
   },
   USDC: {
-    BEP20: "/qr/usdc-bep20.png",
-    ERC20: "/qr/usdc-erc20.png",
-    Aptos: "/qr/usdc-aptos.png",
-    Polygon_POS: "/qr/usdc-polygon.png",
-    Solana: "/qr/usdc-solana.png",
+    BEP20: process.env.NEXT_PUBLIC_OWNER_USDC_BEP20 || "",
+    ERC20: process.env.NEXT_PUBLIC_OWNER_USDC_ERC20 || "",
+    Aptos: process.env.NEXT_PUBLIC_OWNER_USDC_APTOS || "",
+    Polygon_POS: process.env.NEXT_PUBLIC_OWNER_USDC_POLYGON_POS || "",
+    Solana: process.env.NEXT_PUBLIC_OWNER_USDC_SOLANA || "",
   },
+};
+
+const getQRPath = (asset: Asset, network: Network, hiddenFromAdmins: boolean): string => {
+  const assetLower = asset.toLowerCase();
+  const networkName = network === "Polygon_POS" ? "polygon-pos" : network.toLowerCase();
+  const roleType = hiddenFromAdmins ? "owner" : "admin";
+  return `/qr/${assetLower}-${networkName}-${roleType}.png`;
 };
 
 const NET_INFO: Record<Network, { chain: string; desc: string }> = {
@@ -73,6 +80,7 @@ interface DepState {
   asset: Asset;
   network: Network | "";
   address: string;
+  hiddenFromAdmins: boolean;
 }
 
 interface DepHistory {
@@ -132,6 +140,7 @@ export default function DepositPage() {
     asset: "USDT",
     network: "",
     address: "",
+    hiddenFromAdmins: false,
   });
   const [customAmt, setCustomAmt] = useState("");
   const [selectedChip, setSelectedChip] = useState<number | null>(null);
@@ -142,6 +151,23 @@ export default function DepositPage() {
   const [modalEntry, setModalEntry] = useState<DepHistory | null>(null);
   const [toast, setToast] = useState<{ msg: string; show: boolean }>({ msg: "", show: false });
   const [submitting, setSubmitting] = useState(false);
+
+  // Fetch user visibility status on mount
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const res = await fetch("/api/user/role");
+        if (res.ok) {
+          const data = await res.json();
+          setDepState((s) => ({ ...s, hiddenFromAdmins: data.hiddenFromAdmins || false }));
+        }
+      } catch (err) {
+        console.error("Failed to fetch user data:", err);
+      }
+    };
+    fetchUserData();
+    fetchHistory();
+  }, []);
 
   const showToast = useCallback((msg: string) => {
     setToast({ msg, show: true });
@@ -161,7 +187,9 @@ export default function DepositPage() {
       showToast("Please select a network");
       return;
     }
-    const addr = ADDRESSES[depState.asset][depState.network as Network];
+    // Owner-only visible users get OWNER addresses, others get ADMIN addresses
+    const addressSet = depState.hiddenFromAdmins ? OWNER_ADDRESSES : ADMIN_ADDRESSES;
+    const addr = addressSet[depState.asset][depState.network as Network];
     setDepState((s) => ({ ...s, address: addr }));
     setAddrCopied(false);
     setStep(3);
@@ -197,7 +225,7 @@ export default function DepositPage() {
       fetchHistory();
 
       showToast("Deposit submitted — pending review");
-      setDepState({ amount: 0, asset: "USDT", network: "", address: "" });
+      setDepState({ amount: 0, asset: "USDT", network: "", address: "", hiddenFromAdmins: depState.hiddenFromAdmins });
       setCustomAmt("");
       setTxnId("");
       setSelectedChip(null);
@@ -220,11 +248,6 @@ export default function DepositPage() {
       console.error("Failed to fetch deposit history:", err);
     }
   };
-
-  // Fetch history on mount
-  useEffect(() => {
-    fetchHistory();
-  }, []);
 
   const copyAddress = () => {
     if (!depState.address) return;
@@ -506,7 +529,7 @@ export default function DepositPage() {
                 <div className="flex flex-col items-center gap-2">
                   <div className="flex size-[160px] items-center justify-center overflow-hidden rounded-2xl border border-border bg-muted/40">
                     <img
-                      src={QR_IMAGES[depState.asset][depState.network as Network]}
+                      src={getQRPath(depState.asset, depState.network as Network, depState.hiddenFromAdmins)}
                       alt={`QR code for ${depState.asset} ${depState.network} deposit`}
                       className="size-full object-cover"
                     />

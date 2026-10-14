@@ -28,6 +28,7 @@ type DbUser = {
   two_fa_secret?: string | null;
   backup_codes?: string[] | null;
   password_changed_at?: string | null;
+  hidden_from_admins?: boolean | null;
 };
 type OtpPurpose = "signup" | "password_reset";
 
