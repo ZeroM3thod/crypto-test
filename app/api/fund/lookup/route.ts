@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { bad, getSession, supabase, q } from "@/lib/auth/backend";
+import { bad, getSession, supabase, q, avatarForUser } from "@/lib/auth/backend";
 
 export async function GET(req: NextRequest) {
   const session = await getSession(req);
@@ -49,6 +49,7 @@ export async function GET(req: NextRequest) {
       walletAddress: user.wallet_address,
       handle: type === "email" ? user.email : type === "userId" ? user.user_id : user.wallet_address,
       lookupType: type,
+      avatarUrl: avatarForUser(user.id),
     },
   });
 }

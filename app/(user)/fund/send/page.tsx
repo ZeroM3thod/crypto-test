@@ -29,7 +29,7 @@ interface Recipient {
   email: string;
   handle: string; // email, id, or wallet — whatever was searched
   lookupType: LookupType;
-  avatarInitials: string;
+  avatarUrl: string;
   verified: boolean;
 }
 
@@ -167,7 +167,7 @@ export default function SendPage() {
         email: rec.email,
         handle: rec.handle,
         lookupType: rec.lookupType,
-        avatarInitials: rec.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase(),
+        avatarUrl: rec.avatarUrl,
         verified: true,
       });
       setStep(2);
@@ -444,9 +444,11 @@ export default function SendPage() {
 
               {/* Recipient confirmation card */}
               <div className="mb-5 flex items-center gap-3 rounded-2xl border border-foreground bg-foreground/5 p-4">
-                <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-foreground text-sm font-bold text-background">
-                  {recipient.avatarInitials}
-                </div>
+                <img
+                  src={recipient.avatarUrl}
+                  alt={recipient.name}
+                  className="size-11 shrink-0 rounded-full"
+                />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-foreground">{recipient.name}</span>
