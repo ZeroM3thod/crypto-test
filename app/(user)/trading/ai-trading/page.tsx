@@ -9,7 +9,7 @@ import {
   Lock,
   LockOpen,
   Calendar,
-  Percent,
+  TrendingUp,
   Wallet,
   X,
 } from "lucide-react";
@@ -412,12 +412,15 @@ function StrategyCard({
   const isUnlocked = strategy.status === "unlocked";
   const isEmpty = strategy.status === "not-invested";
   const daysLeft = Math.max(0, strategy.lockDays - strategy.daysElapsed);
+  const lockPct = isUnlocked
+    ? 100
+    : Math.min(100, Math.max(0, (strategy.daysElapsed / Math.max(1, strategy.lockDays)) * 100));
   const [state, setState] = useState<ButtonState>("idle");
 
   const runWithdraw = async () => {
     if (state === "loading") return;
     setState("loading");
-    
+
     try {
       const res = await fetch("/api/ai-trading/withdraw", {
         method: "POST",
@@ -442,97 +445,144 @@ function StrategyCard({
   };
 
   return (
-    <Card>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-foreground/5 text-foreground">
-            <Bot className="size-4" />
-          </div>
-          <div>
+    <div className="group flex flex-col overflow-hidden rounded-4xl border border-border bg-card transition-all duration-200 hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-lg">
+      {/* ── Hero: name, status, big ROI ───────────────── */}
+      <div className="relative bg-foreground/[0.04] px-6 pb-5 pt-6">
+        {/* soft decorative ring */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-10 -top-10 size-36 rounded-full border border-foreground/5"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-4 -top-4 size-20 rounded-full border border-foreground/5"
+        />
+
+        <div className="relative flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="grid size-9 shrink-0 place-items-center rounded-full bg-foreground text-background">
+              <Bot className="size-4" />
+            </div>
             <p className="text-sm font-semibold text-card-foreground">{strategy.name}</p>
-            <p className="text-[11px] text-muted-foreground">Min ${strategy.minStake}</p>
           </div>
+          {isEmpty && <Badge label="Available" tone="muted" />}
+          {isLocked && <Badge label="Locked" tone="destructive" />}
+          {isUnlocked && <Badge label="Unlocked" tone="success" />}
         </div>
-        {isEmpty && <Badge label="Available" tone="muted" />}
-        {isLocked && <Badge label="Locked" tone="destructive" />}
-        {isUnlocked && <Badge label="Unlocked" tone="success" />}
-      </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        <div>
-          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Min. Stake</p>
-          <p className="mt-0.5 text-sm font-semibold text-foreground">${strategy.minStake.toFixed(2)}</p>
-        </div>
-        <div>
-          <p className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-            <Percent className="size-3" /> Total ROI
+        <div className="relative mt-6">
+          <p className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+            <TrendingUp className="size-3" /> Total ROI
           </p>
-          <p className="mt-0.5 text-sm font-semibold text-success">+{strategy.roiPct.toFixed(1)}%</p>
-        </div>
-        <div>
-          <p className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-            <Calendar className="size-3" /> Days Running
+          <p className="mt-1 text-4xl font-semibold tracking-tight text-success">
+            +{strategy.roiPct.toFixed(1)}
+            <span className="ml-0.5 text-xl font-medium">%</span>
           </p>
-          <p className="mt-0.5 text-sm font-semibold text-foreground">{strategy.daysRunning}</p>
-        </div>
-        <div>
-          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Lock Period</p>
-          <p className="mt-0.5 text-sm font-semibold text-foreground">{strategy.lockDays} days</p>
         </div>
       </div>
 
-      {!isEmpty && (
-        <div className="mt-4 space-y-2 rounded-2xl bg-background p-3">
-          <div className="flex justify-between text-xs">
-            <span className="text-muted-foreground">Your Invested</span>
-            <span className="font-medium text-foreground">${strategy.invested?.toFixed(2)}</span>
+      {/* ── Body ──────────────────────────────────────── */}
+      <div className="flex flex-1 flex-col gap-4 p-6">
+        {/* Plan details */}
+        <dl className="divide-y divide-border text-xs">
+          <div className="flex items-center justify-between pb-2.5">
+            <dt className="flex items-center gap-1.5 text-muted-foreground">
+              <Wallet className="size-3.5" /> Min. stake
+            </dt>
+            <dd className="font-semibold text-foreground">${strategy.minStake.toFixed(2)}</dd>
           </div>
-          <div className="flex justify-between text-xs">
-            <span className="text-muted-foreground">Current Profit</span>
-            <span className="font-medium text-success">+${strategy.currentProfit?.toFixed(2)}</span>
+          <div className="flex items-center justify-between py-2.5">
+            <dt className="flex items-center gap-1.5 text-muted-foreground">
+              <Calendar className="size-3.5" /> Days running
+            </dt>
+            <dd className="font-semibold text-foreground">{strategy.daysRunning}</dd>
           </div>
-          <div className="flex justify-between text-xs">
-            <span className="text-muted-foreground">Withdrawal</span>
-            <span className={`flex items-center gap-1 font-medium ${isUnlocked ? "text-success" : "text-destructive"}`}>
-              {isUnlocked ? <LockOpen className="size-3" /> : <Lock className="size-3" />}
-              {isUnlocked ? "Available now" : `Unlocks in ${daysLeft}d`}
-            </span>
+          <div className="flex items-center justify-between pt-2.5">
+            <dt className="flex items-center gap-1.5 text-muted-foreground">
+              <Lock className="size-3.5" /> Lock period
+            </dt>
+            <dd className="font-semibold text-foreground">{strategy.lockDays} days</dd>
           </div>
-        </div>
-      )}
+        </dl>
 
-      <div className="mt-4">
-        {isEmpty && (
-          <StatefulButton
-            className="h-10 w-full text-xs"
-            variant="success"
-            state="idle"
-            onClick={() => onInvest(strategy)}
-          >
-            Invest from ${strategy.minStake}
-          </StatefulButton>
+        {/* Your position */}
+        {!isEmpty && (
+          <div className="rounded-2xl bg-background p-4">
+            <div className="flex items-end justify-between">
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Your invested
+                </p>
+                <p className="mt-0.5 text-base font-semibold text-foreground">
+                  ${fmt(strategy.invested ?? 0)}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Profit
+                </p>
+                <p className="mt-0.5 text-base font-semibold text-success">
+                  +${fmt(strategy.currentProfit ?? 0)}
+                </p>
+              </div>
+            </div>
+
+            {/* Lock progress */}
+            <div className="mt-4">
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                <motion.div
+                  className="h-full rounded-full bg-foreground"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${lockPct}%` }}
+                  transition={{ duration: 0.7, ease: "easeOut" }}
+                />
+              </div>
+              <p
+                className={`mt-2 flex items-center gap-1 text-[11px] font-medium ${
+                  isUnlocked ? "text-success" : "text-muted-foreground"
+                }`}
+              >
+                {isUnlocked ? <LockOpen className="size-3" /> : <Lock className="size-3" />}
+                {isUnlocked ? "Withdrawal available now" : `Unlocks in ${daysLeft}d`}
+              </p>
+            </div>
+          </div>
         )}
-        {isLocked && (
-          <button
-            type="button"
-            disabled
-            className="h-10 w-full cursor-not-allowed rounded-full bg-muted text-xs font-semibold text-muted-foreground"
-          >
-            Locked until {strategy.lockDays - strategy.daysElapsed}d remain
-          </button>
-        )}
-        {isUnlocked && (
-          <StatefulButton
-            className="h-10 w-full text-xs"
-            variant="destructive"
-            state={state}
-            onClick={runWithdraw}
-          >
-            Withdraw
-          </StatefulButton>
-        )}
+
+        {/* CTA */}
+        <div className="mt-auto">
+          {isEmpty && (
+            <StatefulButton
+              className="h-10 w-full text-xs"
+              variant="success"
+              state="idle"
+              onClick={() => onInvest(strategy)}
+            >
+              Invest from ${strategy.minStake}
+            </StatefulButton>
+          )}
+          {isLocked && (
+            <button
+              type="button"
+              disabled
+              className="h-10 w-full cursor-not-allowed rounded-full bg-muted text-xs font-semibold text-muted-foreground"
+            >
+              Locked · {daysLeft}d remaining
+            </button>
+          )}
+          {isUnlocked && (
+            <StatefulButton
+              className="h-10 w-full text-xs"
+              variant="destructive"
+              state={state}
+              onClick={runWithdraw}
+            >
+              Withdraw
+            </StatefulButton>
+          )}
+        </div>
       </div>
-    </Card>
+    </div>
   );
 }
 
