@@ -339,7 +339,7 @@ export function KycView({ initial }: { initial: any[] }) {
                   <Field label="User ID" value={active.user?.user_id || "N/A"} />
                   <Field label="Email address" value={active.user?.email || "N/A"} />
                   <Field label="Phone number" value={active.user?.phone || "N/A"} />
-                  <Field label="Full name" value={`${active.first_name} ${active.last_name}`} />
+                  <Field label="Full name" value={`${active.user?.first_name || ""} ${active.user?.last_name || ""}`.trim() || "N/A"} />
                 </div>
               </Section>
 
