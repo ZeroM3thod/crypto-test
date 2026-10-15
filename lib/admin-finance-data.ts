@@ -1,9 +1,13 @@
 // lib/admin-finance-data.ts
-// Only the History page uses this file now — deposits and withdrawals moved
-// to lib/admin-review-data.ts.
-export type HistoryStatus = "completed" | "pending" | "failed";
+import { createClient } from "@supabase/supabase-js";
 
-export type HistoryType = "Deposit" | "Withdraw" | "Send Money" | "Manual Trade";
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+export type HistoryStatus = "completed" | "pending" | "failed" | "approved" | "rejected";
+export type HistoryType = "Deposit" | "Withdraw" | "Send Money";
 
 export type HistoryItem = {
   id: string;
@@ -16,17 +20,151 @@ export type HistoryItem = {
   date: string;
 };
 
-export function getHistory(): HistoryItem[] {
-  return [
-    { id: "TX-10492", user: "Rahim Uddin", email: "rahim@example.com", type: "Deposit", amount: 1200, fee: 0, status: "completed", date: "2026-10-03 14:22" },
-    { id: "TX-10491", user: "Sadia Akter", email: "sadia@example.com", type: "Withdraw", amount: 450, fee: 9, status: "pending", date: "2026-10-03 13:50" },
-    { id: "TX-10490", user: "Tanvir Hasan", email: "tanvir@example.com", type: "Send Money", amount: 300, fee: 3, status: "completed", date: "2026-10-03 12:41" },
-    { id: "TX-10489", user: "Nusrat Jahan", email: "nusrat@example.com", type: "Manual Trade", amount: 2100, fee: 0, status: "completed", date: "2026-10-02 22:10" },
-    { id: "TX-10488", user: "Imran Khan", email: "imran@example.com", type: "Withdraw", amount: 800, fee: 16, status: "failed", date: "2026-10-02 16:44" },
-    { id: "TX-10487", user: "Mim Chowdhury", email: "mim@example.com", type: "Deposit", amount: 5000, fee: 0, status: "completed", date: "2026-10-02 11:05" },
-    { id: "TX-10486", user: "Arif Hossain", email: "arif@example.com", type: "Send Money", amount: 150, fee: 1.5, status: "completed", date: "2026-10-01 18:20" },
-    { id: "TX-10485", user: "Farhana Islam", email: "farhana@example.com", type: "Withdraw", amount: 620, fee: 12.4, status: "completed", date: "2026-10-01 16:02" },
-    { id: "TX-10484", user: "Rahim Uddin", email: "rahim@example.com", type: "Manual Trade", amount: 640, fee: 0, status: "completed", date: "2026-10-01 10:33" },
-    { id: "TX-10483", user: "Sadia Akter", email: "sadia@example.com", type: "Send Money", amount: 90, fee: 0.9, status: "failed", date: "2026-09-30 19:47" },
-  ];
+export async function getHistory(userRole: string): Promise<HistoryItem[]> {
+  const items: HistoryItem[] = [];
+
+  // Fetch deposits
+  const depositsQuery = supabase
+    .from("deposits")
+    .select(`
+      id,
+      amount,
+      status,
+      created_at,
+      auth_users!deposits_user_id_fkey (
+        first_name,
+        last_name,
+        email,
+        hidden_from_admins
+      )
+    `)
+    .order("created_at", { ascending: false });
+
+  const { data: deposits } = await depositsQuery;
+
+  if (deposits) {
+    for (const d of deposits) {
+      const user = d.auth_users as any;
+      if (!user) continue;
+      
+      // Filter by role visibility
+      if (userRole === "admin" && user.hidden_from_admins) continue;
+
+      items.push({
+        id: `DEP-${d.id.slice(0, 8)}`,
+        user: `${user.first_name} ${user.last_name}`,
+        email: user.email,
+        type: "Deposit",
+        amount: Number(d.amount),
+        fee: 0,
+        status: d.status as HistoryStatus,
+        date: new Date(d.created_at).toLocaleString("en-US", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      });
+    }
+  }
+
+  // Fetch withdrawals
+  const withdrawalsQuery = supabase
+    .from("withdrawals")
+    .select(`
+      id,
+      amount,
+      fee_amount,
+      status,
+      created_at,
+      auth_users!withdrawals_user_id_fkey (
+        first_name,
+        last_name,
+        email,
+        hidden_from_admins
+      )
+    `)
+    .order("created_at", { ascending: false });
+
+  const { data: withdrawals } = await withdrawalsQuery;
+
+  if (withdrawals) {
+    for (const w of withdrawals) {
+      const user = w.auth_users as any;
+      if (!user) continue;
+      
+      // Filter by role visibility
+      if (userRole === "admin" && user.hidden_from_admins) continue;
+
+      items.push({
+        id: `WTH-${w.id.slice(0, 8)}`,
+        user: `${user.first_name} ${user.last_name}`,
+        email: user.email,
+        type: "Withdraw",
+        amount: Number(w.amount),
+        fee: Number(w.fee_amount),
+        status: w.status as HistoryStatus,
+        date: new Date(w.created_at).toLocaleString("en-US", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      });
+    }
+  }
+
+  // Fetch send transactions
+  const sendQuery = supabase
+    .from("send_transactions")
+    .select(`
+      id,
+      amount,
+      fee,
+      status,
+      created_at,
+      sender:auth_users!send_transactions_sender_id_fkey (
+        first_name,
+        last_name,
+        email,
+        hidden_from_admins
+      )
+    `)
+    .order("created_at", { ascending: false });
+
+  const { data: sends } = await sendQuery;
+
+  if (sends) {
+    for (const s of sends) {
+      const user = s.sender as any;
+      if (!user) continue;
+      
+      // Filter by role visibility
+      if (userRole === "admin" && user.hidden_from_admins) continue;
+
+      items.push({
+        id: `SND-${s.id.slice(0, 8)}`,
+        user: `${user.first_name} ${user.last_name}`,
+        email: user.email,
+        type: "Send Money",
+        amount: Number(s.amount),
+        fee: Number(s.fee),
+        status: s.status === "completed" ? "completed" : s.status === "pending" ? "pending" : "failed",
+        date: new Date(s.created_at).toLocaleString("en-US", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      });
+    }
+  }
+
+  // Sort by date descending
+  items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  return items;
 }
