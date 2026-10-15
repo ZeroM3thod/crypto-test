@@ -2,7 +2,7 @@
 "use client";
 
 import { UserShell } from "@/app/(user)/_components/user-shell";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   ArrowDownCircle,
   ArrowUpCircle,
@@ -18,7 +18,7 @@ import {
    Types
 ──────────────────────────────────────────────────────────── */
 
-type TxnType = "deposit" | "withdrawal" | "send";
+type TxnType = "deposit" | "withdrawal" | "send" | "receive";
 type TxnStatus = "approved" | "completed" | "pending" | "rejected" | "failed";
 
 interface FundTxn {
@@ -36,133 +36,25 @@ interface FundTxn {
   reason?: string;
 }
 
-/* Placeholder data — replace with a real merged fetch from your API */
-const ALL_HISTORY: FundTxn[] = [
-  {
-    id: "DEP-9C41A2",
-    type: "deposit",
-    date: "Jul 18, 2025",
-    amount: 500,
-    fee: 0,
-    net: 500,
-    coin: "USDT",
-    network: "TRC-20",
-    status: "approved",
-  },
-  {
-    id: "SND-7A21F9",
-    type: "send",
-    date: "Jul 15, 2025",
-    amount: 120,
-    fee: 0.1,
-    net: 120.1,
-    coin: "USD",
-    counterparty: "Jane Doe (jane@doe.com)",
-    status: "completed",
-  },
-  {
-    id: "WD-9F2A7C31",
-    type: "withdrawal",
-    date: "Jul 16, 2025",
-    amount: 200,
-    fee: 20,
-    net: 180,
-    coin: "USDT",
-    network: "BEP-20",
-    counterparty: "0xa73e40...c7c0e7",
-    status: "approved",
-  },
-  {
-    id: "DEP-B4E2F1",
-    type: "deposit",
-    date: "Jul 14, 2025",
-    amount: 250,
-    fee: 0,
-    net: 250,
-    coin: "USDC",
-    network: "ERC-20",
-    status: "pending",
-  },
-  {
-    id: "SND-3B88C0",
-    type: "send",
-    date: "Jul 9, 2025",
-    amount: 45,
-    fee: 0.1,
-    net: 45.1,
-    coin: "USD",
-    counterparty: "Michael Chen (USR10234)",
-    status: "completed",
-    note: "Split for dinner",
-  },
-  {
-    id: "WD-4B8E1D02",
-    type: "withdrawal",
-    date: "Jul 11, 2025",
-    amount: 75,
-    fee: 7.5,
-    net: 67.5,
-    coin: "USDC",
-    network: "BEP-20",
-    counterparty: "0x91cd22...5f0a19",
-    status: "pending",
-    note: "Monthly cash-out",
-  },
-  {
-    id: "DEP-A1C3E5",
-    type: "deposit",
-    date: "Jul 10, 2025",
-    amount: 80,
-    fee: 0,
-    net: 80,
-    coin: "USDT",
-    network: "BEP-20",
-    status: "rejected",
-    reason: "Transaction hash could not be verified on-chain.",
-  },
-  {
-    id: "SND-1F0E22",
-    type: "send",
-    date: "Jul 2, 2025",
-    amount: 300,
-    fee: 0.1,
-    net: 300.1,
-    coin: "USD",
-    counterparty: "Amara Okafor (0xa73e40...c7c0e7)",
-    status: "failed",
-  },
-  {
-    id: "WD-1C5F9A44",
-    type: "withdrawal",
-    date: "Jul 3, 2025",
-    amount: 40,
-    fee: 4,
-    net: 36,
-    coin: "USDT",
-    network: "BEP-20",
-    counterparty: "0x77ab90...2e4b31",
-    status: "rejected",
-    reason: "Wallet address did not match verified profile records.",
-  },
-];
-
 /* ────────────────────────────────────────────────────────────
    Config
 ──────────────────────────────────────────────────────────── */
 
-type FilterTab = "all" | "deposit" | "withdrawal" | "send";
+type FilterTab = "all" | "deposit" | "withdrawal" | "send" | "receive";
 
 const FILTER_TABS: { id: FilterTab; label: string }[] = [
   { id: "all", label: "All" },
   { id: "deposit", label: "Deposits" },
   { id: "withdrawal", label: "Withdrawals" },
   { id: "send", label: "Sends" },
+  { id: "receive", label: "Received" },
 ];
 
 const TYPE_META: Record<TxnType, { label: string; icon: typeof ArrowDownCircle; sign: "+" | "−" }> = {
   deposit: { label: "Deposit", icon: ArrowDownCircle, sign: "+" },
   withdrawal: { label: "Withdrawal", icon: ArrowUpCircle, sign: "−" },
   send: { label: "Send", icon: SendIcon, sign: "−" },
+  receive: { label: "Received", icon: ArrowDownCircle, sign: "+" },
 };
 
 /* ────────────────────────────────────────────────────────────
@@ -198,41 +90,53 @@ export default function FundHistoryPage() {
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [modalOpen, setModalOpen] = useState(false);
   const [modalEntry, setModalEntry] = useState<FundTxn | null>(null);
+  const [allHistory, setAllHistory] = useState<FundTxn[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({ deposited: 0, withdrawn: 0, sent: 0, received: 0 });
+
+  // Fetch transaction history on mount
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const res = await fetch("/api/fund/history");
+        if (res.ok) {
+          const data = await res.json();
+          setAllHistory(data.history || []);
+          setStats(data.stats || { deposited: 0, withdrawn: 0, sent: 0, received: 0 });
+        }
+      } catch (err) {
+        console.error("Failed to fetch transaction history:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchHistory();
+  }, []);
 
   const filtered = useMemo(() => {
-    if (activeTab === "all") return ALL_HISTORY;
-    return ALL_HISTORY.filter((t) => t.type === activeTab);
-  }, [activeTab]);
-
-  const stats = useMemo(() => {
-    const deposited = ALL_HISTORY.filter((t) => t.type === "deposit" && t.status === "approved").reduce(
-      (s, t) => s + t.amount,
-      0
-    );
-    const withdrawn = ALL_HISTORY.filter((t) => t.type === "withdrawal" && t.status === "approved").reduce(
-      (s, t) => s + t.amount,
-      0
-    );
-    const sent = ALL_HISTORY.filter((t) => t.type === "send" && t.status === "completed").reduce(
-      (s, t) => s + t.amount,
-      0
-    );
-    return { deposited, withdrawn, sent };
-  }, []);
+    if (activeTab === "all") return allHistory;
+    return allHistory.filter((t) => t.type === activeTab);
+  }, [activeTab, allHistory]);
 
   const counts = useMemo(() => {
     return {
-      all: ALL_HISTORY.length,
-      deposit: ALL_HISTORY.filter((t) => t.type === "deposit").length,
-      withdrawal: ALL_HISTORY.filter((t) => t.type === "withdrawal").length,
-      send: ALL_HISTORY.filter((t) => t.type === "send").length,
+      all: allHistory.length,
+      deposit: allHistory.filter((t) => t.type === "deposit").length,
+      withdrawal: allHistory.filter((t) => t.type === "withdrawal").length,
+      send: allHistory.filter((t) => t.type === "send").length,
+      receive: allHistory.filter((t) => t.type === "receive").length,
     };
-  }, []);
+  }, [allHistory]);
 
   return (
     <UserShell active="Fund History">
       <div className="relative overflow-y-auto px-5 py-6 sm:px-7 sm:py-8">
-        <div className="mx-auto max-w-2xl space-y-6">
+        {loading ? (
+          <div className="flex h-full items-center justify-center">
+            <div className="text-muted-foreground">Loading...</div>
+          </div>
+        ) : (
+          <div className="mx-auto max-w-2xl space-y-6">
           {/* Header */}
           <div>
             <p className="text-xs font-medium text-muted-foreground">Transactions</p>
@@ -243,7 +147,7 @@ export default function FundHistoryPage() {
 
           {/* SUMMARY CARD */}
           <div className="rounded-4xl border border-border bg-card p-6">
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
               <div>
                 <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Deposited</div>
                 <div className="mt-1.5 text-lg font-semibold tracking-tight text-success sm:text-xl">
@@ -260,6 +164,12 @@ export default function FundHistoryPage() {
                 <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Sent</div>
                 <div className="mt-1.5 text-lg font-semibold tracking-tight text-foreground sm:text-xl">
                   ${stats.sent.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Received</div>
+                <div className="mt-1.5 text-lg font-semibold tracking-tight text-success sm:text-xl">
+                  ${stats.received.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </div>
               </div>
             </div>
@@ -354,10 +264,9 @@ export default function FundHistoryPage() {
               )}
             </div>
           </div>
-        </div>
 
-        {/* DETAIL MODAL */}
-        {modalOpen && modalEntry && (
+          {/* DETAIL MODAL */}
+          {modalOpen && modalEntry && (
           <div
             className="fixed inset-0 z-[900] flex items-end justify-center bg-foreground/30 backdrop-blur-sm sm:items-center"
             onClick={(e) => {
@@ -460,6 +369,8 @@ export default function FundHistoryPage() {
             </div>
           </div>
         )}
+        </div>
+      )}
       </div>
     </UserShell>
   );
