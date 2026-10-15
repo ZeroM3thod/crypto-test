@@ -51,12 +51,18 @@ export async function POST(req: NextRequest) {
     }),
   });
 
+  // Get recipient's main wallet balance
+  const recipientWallets = await supabase<{ balance: number }[]>(
+    `wallet_accounts?select=balance&user_id=eq.${q(recipientId)}&wallet=eq.main&limit=1`
+  );
+  const recipientBalance = recipientWallets[0]?.balance || 0;
+
   // Add to recipient's main wallet
   await supabase(`wallet_accounts?user_id=eq.${q(recipientId)}&wallet=eq.main`, {
     method: "PATCH",
     headers: { Prefer: "return=minimal" },
     body: JSON.stringify({
-      balance: `balance + ${amount}`,
+      balance: recipientBalance + amount,
       updated_at: new Date().toISOString(),
     }),
   });
