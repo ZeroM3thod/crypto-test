@@ -509,7 +509,6 @@ export function AiTradingManagement() {
                   strategy={s}
                   investorCount={inv.length}
                   totalStaked={inv.reduce((a, i) => a + i.invested, 0)}
-                  todayRoi={null}
                   onPostRoi={() => openManualRoi(s.id)}
                   onEdit={() => { setFormError(null); setForm(toForm(s)); }}
                   onViewUsers={() => {
