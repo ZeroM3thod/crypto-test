@@ -52,12 +52,21 @@ export type UserDetail = {
 
 export async function getAllUsers(): Promise<UserRow[]> {
   const session = await getSessionUser();
-  const { data: users, error } = await db
-    .from('auth_users')
-    .select('*')
-    .eq('role', 'user')
-    .or(session?.role === 'owner' ? 'hidden_from_admins.eq.true,hidden_from_admins.eq.false' : 'hidden_from_admins.eq.false')
-    .order('created_at', { ascending: false });
+  
+  let query = db.from('auth_users').select('*');
+  
+  if (session?.role === 'owner') {
+    // Owner sees all users (admin, owner, user)
+    query = query.in('role', ['user', 'admin', 'owner']);
+  } else if (session?.role === 'admin') {
+    // Admin sees only users who are not hidden
+    query = query.eq('role', 'user').eq('hidden_from_admins', false);
+  } else {
+    // Fallback: only regular users
+    query = query.eq('role', 'user');
+  }
+  
+  const { data: users, error } = await query.order('created_at', { ascending: false });
 
   if (error) throw error;
 

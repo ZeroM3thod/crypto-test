@@ -69,38 +69,26 @@ type StrategyForm = {
   exchange: string;
   minStake: string;
   lockDays: string;
-  daysRunning: string;
-  totalRoi: string;
+  cycleTotalRoi: string; // Total ROI for 30-day cycle
 };
 
 const EMPTY_FORM: StrategyForm = {
   id: null, name: "", exchange: "Binance", minStake: "", lockDays: "15",
-  daysRunning: "0", totalRoi: "0",
+  cycleTotalRoi: "0",
 };
 
 const toForm = (s: Strategy): StrategyForm => ({
   id: s.id, name: s.name, exchange: s.exchange, minStake: String(s.minStake),
-  lockDays: String(s.lockDays), daysRunning: String(s.daysRunning),
-  totalRoi: String(s.totalRoi),
+  lockDays: String(s.lockDays), cycleTotalRoi: String(s.totalRoi),
 });
-
-// ── Daily ROI form (multi-day) ───────────────────────────────────────────
-type RoiRow = { date: string; roi: string };
-type RoiForm = {
-  strategyId: string;
-  rows: RoiRow[];
-  rangeFrom: string;
-  rangeTo: string;
-};
 
 // ── Strategy card ────────────────────────────────────────────────────────
 function AdminStrategyCard({
-  strategy, investorCount, totalStaked, todayRoi, onEdit, onViewUsers, onPostRoi,
+  strategy, investorCount, totalStaked, onEdit, onViewUsers, onPostRoi,
 }: {
   strategy: Strategy;
   investorCount: number;
   totalStaked: number;
-  todayRoi: number | null; // null = not posted yet today
   onEdit: () => void;
   onViewUsers: () => void;
   onPostRoi: () => void;
@@ -117,11 +105,7 @@ function AdminStrategyCard({
             <p className="text-[11px] text-muted-foreground">{strategy.exchange}</p>
           </div>
         </div>
-        {todayRoi !== null ? (
-          <Badge label={`${pctText(todayRoi)} today`} tone={todayRoi < 0 ? "destructive" : "success"} />
-        ) : (
-          <Badge label="Not posted" tone="muted" />
-        )}
+        <Badge label="Auto" tone="success" />
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-3">
@@ -161,7 +145,7 @@ function AdminStrategyCard({
       </div>
 
       <button type="button" onClick={onPostRoi} className={`${btnPrimary} mt-4 h-10 w-full text-xs`}>
-        <TrendingUp className="size-3.5" /> {todayRoi !== null ? "Update daily ROI" : "Post daily ROI"}
+        <TrendingUp className="size-3.5" /> Manual override today
       </button>
 
       <div className="mt-2 flex gap-2">
@@ -182,14 +166,13 @@ type Row = Investment & { status: "locked" | "unlocked"; daysLeft: number; pct: 
 export function AiTradingManagement() {
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [investments, setInvestments] = useState<Investment[]>([]);
-  const [entries, setEntries] = useState<DailyEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [form, setForm] = useState<StrategyForm | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const [roiForm, setRoiForm] = useState<RoiForm | null>(null);
-  const [roiError, setRoiError] = useState<string | null>(null);
+  const [manualRoi, setManualRoi] = useState<{ strategyId: string; date: string; roi: string } | null>(null);
+  const [manualError, setManualError] = useState<string | null>(null);
 
   const [selectedId, setSelectedId] = useState<string>("");
   const [query, setQuery] = useState("");
@@ -251,9 +234,6 @@ export function AiTradingManagement() {
 
   // Stats
   const totalStaked = investments.reduce((s, i) => s + i.invested, 0);
-  const postedToday = strategies.filter((s) =>
-    entries.some((e) => e.strategyId === s.id && e.date === today),
-  ).length;
 
   // Rows for investors table
   const rows: Row[] = useMemo(() => {
@@ -275,19 +255,17 @@ export function AiTradingManagement() {
     if (!form) return;
     const minStake = parseFloat(form.minStake);
     const lockDays = parseInt(form.lockDays, 10);
-    const daysRunning = parseInt(form.daysRunning, 10);
-    const totalRoi = parseFloat(form.totalRoi);
+    const cycleTotalRoi = parseFloat(form.cycleTotalRoi);
 
     if (!form.name.trim()) return setFormError("Package name is required");
     if (!(minStake > 0)) return setFormError("Minimum stake must be greater than 0");
     if (!(lockDays >= 0)) return setFormError("Lock period must be 0 or more days");
-    if (!(daysRunning >= 0)) return setFormError("Total running days must be 0 or more");
-    if (Number.isNaN(totalRoi)) return setFormError("Total ROI is required");
+    if (Number.isNaN(cycleTotalRoi)) return setFormError("30-day cycle ROI is required");
 
     try {
       if (form.id) {
-        // Update
-        await fetch(`/api/admin/ai-trading/strategies/${form.id}`, {
+        // Update - triggers schedule regeneration
+        const res = await fetch(`/api/admin/ai-trading/strategies/${form.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -295,15 +273,22 @@ export function AiTradingManagement() {
             exchange: form.exchange.trim() || "Binance",
             min_stake: minStake,
             lock_days: lockDays,
-            days_running: daysRunning,
-            total_roi_pct: totalRoi,
           }),
+        });
+
+        if (!res.ok) throw new Error("Update failed");
+
+        // Trigger schedule regeneration with new cycle ROI
+        await fetch(`/api/admin/ai-trading/strategies/${form.id}/regenerate-schedule`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cycle_total_roi_pct: cycleTotalRoi }),
         });
 
         setStrategies((prev) =>
           prev.map((s) =>
             s.id === form.id
-              ? { ...s, name: form.name.trim(), exchange: form.exchange.trim(), minStake, lockDays, daysRunning, totalRoi }
+              ? { ...s, name: form.name.trim(), exchange: form.exchange.trim(), minStake, lockDays }
               : s
           )
         );
@@ -319,15 +304,13 @@ export function AiTradingManagement() {
             exchange: form.exchange.trim() || "Binance",
             min_stake: minStake,
             lock_days: lockDays,
-            days_running: daysRunning,
-            total_roi_pct: totalRoi,
           }),
         });
 
         // Refresh strategies
         const data = await fetch("/api/admin/ai-trading/strategies").then(r => r.json());
         const newStrats: Strategy[] = data.strategies.map((s: any) => ({
-          id: s.id,
+          id: s.strategy_id,
           name: s.name,
           exchange: s.exchange,
           minStake: parseFloat(s.min_stake),
@@ -347,189 +330,34 @@ export function AiTradingManagement() {
     }
   }
 
-  // ── Daily ROI (entered by admin, one or many days at once) ──
-  const existingFor = (strategyId: string, date: string) =>
-    entries.find((e) => e.strategyId === strategyId && e.date === date);
-
-  /** Row for a date, pre-filled when that day was already posted. */
-  const rowFor = (strategyId: string, date: string): RoiRow => {
-    const ex = existingFor(strategyId, date);
-    return { date, roi: ex ? String(ex.roi) : "" };
-  };
-
-  /** Investors who get credited for a date: started on or before that day. */
-  const eligibleFor = (strategyId: string, date: string) =>
-    investments.filter((i) => i.strategyId === strategyId && i.startedAt.slice(0, 10) <= date);
-
-  function openRoi(strategyId: string) {
-    setRoiError(null);
-    setRoiForm({
-      strategyId,
-      rows: [rowFor(strategyId, today)],
-      rangeFrom: dateOffset(6),
-      rangeTo: today,
-    });
+  // ── Manual ROI override (single day) ──
+  function openManualRoi(strategyId: string) {
+    setManualError(null);
+    setManualRoi({ strategyId, date: today, roi: "" });
   }
 
-  const patchRoiForm = (patch: Partial<RoiForm>) =>
-    setRoiForm((f) => (f ? { ...f, ...patch } : f));
+  async function handleSaveManualRoi() {
+    if (!manualRoi) return;
+    const roi = parseFloat(manualRoi.roi);
+    if (Number.isNaN(roi)) return setManualError("Enter ROI %");
+    if (roi < -100) return setManualError("ROI can't be below -100%");
 
-  const sortDesc = (list: RoiRow[]) => [...list].sort((a, b) => (a.date < b.date ? 1 : -1));
+    try {
+      await fetch(`/api/admin/ai-trading/strategies/${manualRoi.strategyId}/daily-roi`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entries: [{ date: manualRoi.date, roi }] }),
+      });
 
-  function changeRowDate(idx: number, date: string) {
-    setRoiForm((f) => {
-      if (!f) return f;
-      const ex = existingFor(f.strategyId, date);
-      return {
-        ...f,
-        rows: f.rows.map((r, i) => (i === idx ? { date, roi: ex ? String(ex.roi) : r.roi } : r)),
-      };
-    });
-  }
-
-  function changeRowRoi(idx: number, roi: string) {
-    setRoiForm((f) => (f ? { ...f, rows: f.rows.map((r, i) => (i === idx ? { ...r, roi } : r)) } : f));
-  }
-
-  function removeRow(idx: number) {
-    setRoiForm((f) => (f && f.rows.length > 1 ? { ...f, rows: f.rows.filter((_, i) => i !== idx) } : f));
-  }
-
-  /** Add the day before the earliest row (handy for filling missed days). */
-  function addDay() {
-    if (!roiForm) return;
-    const earliest = roiForm.rows.map((r) => r.date).filter(Boolean).sort()[0] ?? today;
-    const date = shiftDate(earliest, -1);
-    patchRoiForm({ rows: sortDesc([...roiForm.rows, rowFor(roiForm.strategyId, date)]) });
-  }
-
-  /** Add one row for every day in the chosen range that isn't already listed. */
-  function addRange() {
-    if (!roiForm) return;
-    const { rangeFrom, rangeTo, strategyId } = roiForm;
-    if (!rangeFrom || !rangeTo) return setRoiError("Pick both range dates");
-    if (rangeFrom > rangeTo) return setRoiError("Range start must be before the end");
-    if (rangeTo > today) return setRoiError("You can't post ROI for a future date");
-
-    const dates: string[] = [];
-    for (let d = rangeFrom; d <= rangeTo; d = shiftDate(d, 1)) dates.push(d);
-    if (dates.length > 31) return setRoiError("Pick a range of 31 days or less");
-
-    const have = new Set(roiForm.rows.map((r) => r.date));
-    const fresh = dates.filter((d) => !have.has(d)).map((d) => rowFor(strategyId, d));
-    setRoiError(null);
-    patchRoiForm({ rows: sortDesc([...roiForm.rows, ...fresh]) });
-  }
-
-  /** Per-row preview: who is credited and how much. */
-  const roiPreview = useMemo(() => {
-    if (!roiForm) return null;
-    const items = roiForm.rows.map((r) => {
-      const eligible = investments.filter(
-        (i) => i.strategyId === roiForm.strategyId && i.startedAt.slice(0, 10) <= r.date,
-      );
-      const roi = parseFloat(r.roi);
-      const base = eligible.reduce((s, i) => s + i.invested, 0);
-      return {
-        investors: eligible.length,
-        credit: Number.isNaN(roi) ? 0 : round2((base * roi) / 100),
-        existing: entries.find((e) => e.strategyId === roiForm.strategyId && e.date === r.date),
-      };
-    });
-    return {
-      items,
-      totalCredit: round2(items.reduce((s, x) => s + x.credit, 0)),
-      updates: items.filter((x) => x.existing).length,
-    };
-  }, [roiForm, investments, entries]);
-
-  const roiHistory = useMemo(
-    () =>
-      roiForm
-        ? entries
-            .filter((e) => e.strategyId === roiForm.strategyId)
-            .sort((a, b) => (a.date < b.date ? 1 : -1))
-            .slice(0, 7)
-        : [],
-    [roiForm, entries],
-  );
-
-  const roiStrategy = roiForm ? strategies.find((s) => s.id === roiForm.strategyId) : undefined;
-
-  function handleSaveRoi() {
-    if (!roiForm) return;
-    const { strategyId } = roiForm;
-
-    // 1) validate every row
-    const seen = new Set<string>();
-    const parsed: { date: string; roi: number }[] = [];
-    for (const r of roiForm.rows) {
-      if (!r.date) return setRoiError("Every row needs a date");
-      if (r.date > today) return setRoiError(`${r.date} is in the future`);
-      if (seen.has(r.date)) return setRoiError(`${r.date} is listed twice`);
-      seen.add(r.date);
-      const roi = parseFloat(r.roi);
-      if (Number.isNaN(roi)) return setRoiError(`Enter the ROI for ${r.date}`);
-      if (roi < -100) return setRoiError(`ROI for ${r.date} can't be below -100%`);
-      parsed.push({ date: r.date, roi });
+      setManualError(null);
+      setManualRoi(null);
+      
+      // Refresh page
+      window.location.reload();
+    } catch (err) {
+      console.error(err);
+      setManualError("Save failed");
     }
-
-    // 2) work out what actually changes
-    const changes = parsed
-      .map(({ date, roi }) => {
-        const existing = existingFor(strategyId, date);
-        const delta = roi - (existing?.roi ?? 0);
-        const eligible = eligibleFor(strategyId, date);
-        const credited = round2(eligible.reduce((s, i) => s + (i.invested * roi) / 100, 0));
-        return { date, roi, existing, delta, eligible, credited };
-      })
-      .filter((c) => !c.existing || c.delta !== 0);
-
-    if (changes.length === 0) {
-      setRoiForm(null);
-      return;
-    }
-
-    // 3) apply together
-    // TODO: API → POST /api/admin/ai-trading/strategies/:id/daily-roi { entries: [{ date, roi }, ...] }
-    // Server must be idempotent per (strategy, date): updating a day applies only the difference.
-    const profitDelta = new Map<string, number>();
-    for (const c of changes) {
-      for (const inv of c.eligible) {
-        profitDelta.set(inv.id, (profitDelta.get(inv.id) ?? 0) + (inv.invested * c.delta) / 100);
-      }
-    }
-    const roiDelta = changes.reduce((s, c) => s + c.delta, 0);
-
-    setInvestments((prev) =>
-      prev.map((i) =>
-        profitDelta.has(i.id) ? { ...i, profit: round2(i.profit + profitDelta.get(i.id)!) } : i,
-      ),
-    );
-    setStrategies((prev) =>
-      prev.map((s) => (s.id === strategyId ? { ...s, totalRoi: round2(s.totalRoi + roiDelta) } : s)),
-    );
-    setEntries((prev) => {
-      let next = prev;
-      for (const c of changes) {
-        next = c.existing
-          ? next.map((e) => (e.id === c.existing!.id ? { ...e, roi: c.roi, credited: c.credited } : e))
-          : [
-              ...next,
-              {
-                id: `d${Date.now()}-${c.date}`,
-                strategyId,
-                date: c.date,
-                roi: c.roi,
-                credited: c.credited,
-              },
-            ];
-      }
-      return next;
-    });
-
-    setRoiError(null);
-    setRoiForm(null);
   }
 
   // ── Per-user actions ──
@@ -553,15 +381,26 @@ export function AiTradingManagement() {
     if (!action) return;
     const days = parseInt(extendDays, 10);
     if (!(days > 0)) return;
-    // TODO: API → POST /api/admin/ai-trading/investments/:id/extend { days }
-    setInvestments((prev) =>
-      prev.map((i) =>
-        i.id === action.inv.id
-          ? { ...i, lockDays: i.lockDays + days, forceUnlocked: false }
-          : i
-      )
-    );
-    setAction(null);
+    
+    fetch(`/api/admin/ai-trading/investments/${action.inv.id}/extend`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ days }),
+    })
+      .then(() => {
+        setInvestments((prev) =>
+          prev.map((i) =>
+            i.id === action.inv.id
+              ? { ...i, lockDays: i.lockDays + days, forceUnlocked: false }
+              : i
+          )
+        );
+        setAction(null);
+      })
+      .catch((err) => {
+        console.error(err);
+        alert("Extend failed");
+      });
   }
 
   // ── Table columns ──
@@ -626,8 +465,6 @@ export function AiTradingManagement() {
     },
   ];
 
-  const dayCount = roiForm?.rows.length ?? 0;
-
   return (
     <>
       <div className="space-y-8 overflow-y-auto px-5 py-6 sm:px-7 sm:py-8">
@@ -654,7 +491,6 @@ export function AiTradingManagement() {
             <Card><Stat label="Strategies" value={String(strategies.length)} icon={<Bot className="size-3.5" />} /></Card>
             <Card><Stat label="Total Investors" value={String(investments.length)} icon={<Users className="size-3.5" />} /></Card>
             <Card><Stat label="Total Staked" value={`$${fmt(totalStaked)}`} icon={<Wallet className="size-3.5" />} /></Card>
-            <Card><Stat label="Posted Today" value={`${postedToday} / ${strategies.length}`} icon={<Percent className="size-3.5" />} /></Card>
           </div>
         </section>
 
@@ -662,20 +498,19 @@ export function AiTradingManagement() {
         <section aria-label="Strategies">
           <SectionHeader
             title="Strategies"
-            description="Create packages and post ROI manually, for one day or many days at once. Negative ROI records a loss. Lock-period changes only affect new investors."
+            description="Set 30-day cycle ROI. System auto-distributes daily with random variance. Use 'Manual override' to adjust specific days."
           />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {strategies.map((s) => {
               const inv = investments.filter((i) => i.strategyId === s.id);
-              const todayEntry = entries.find((e) => e.strategyId === s.id && e.date === today);
               return (
                 <AdminStrategyCard
                   key={s.id}
                   strategy={s}
                   investorCount={inv.length}
                   totalStaked={inv.reduce((a, i) => a + i.invested, 0)}
-                  todayRoi={todayEntry ? todayEntry.roi : null}
-                  onPostRoi={() => openRoi(s.id)}
+                  todayRoi={null}
+                  onPostRoi={() => openManualRoi(s.id)}
                   onEdit={() => { setFormError(null); setForm(toForm(s)); }}
                   onViewUsers={() => {
                     setSelectedId(s.id);
@@ -773,171 +608,62 @@ export function AiTradingManagement() {
               <Field label="Lock period (days)">
                 <input className={inputCls} type="number" min="0" value={form.lockDays} onChange={(e) => set("lockDays", e.target.value)} />
               </Field>
-              <Field label="Total running days">
-                <input className={inputCls} type="number" min="0" value={form.daysRunning} onChange={(e) => set("daysRunning", e.target.value)} />
-              </Field>
-              <Field label="Total ROI (%)">
-                <input className={inputCls} type="number" step="0.1" value={form.totalRoi} onChange={(e) => set("totalRoi", e.target.value)} />
+              <Field label="30-Day Cycle Total ROI (%)">
+                <input className={inputCls} type="number" step="0.1" value={form.cycleTotalRoi} onChange={(e) => set("cycleTotalRoi", e.target.value)} />
               </Field>
             </div>
             <p className="text-[11px] text-muted-foreground">
-              Daily ROI is not fixed. Post it from the strategy card using “Post daily ROI”.
+              Enter the total ROI % for a 30-day cycle. System auto-distributes it daily with random variance. Use "Manual override" button to adjust specific days.
             </p>
             {formError && <p className="text-xs font-medium text-destructive">{formError}</p>}
           </div>
         )}
       </Modal>
 
-      {/* Post / update daily ROI (one or many days) */}
+      {/* Manual ROI override (single day) */}
       <Modal
-        open={!!roiForm}
-        onClose={() => setRoiForm(null)}
-        title={dayCount > 1 ? `Post ROI for ${dayCount} days` : roiPreview?.updates ? "Update daily ROI" : "Post daily ROI"}
-        subtitle={roiStrategy ? `${roiStrategy.name} · applied to every investor of this package` : undefined}
+        open={!!manualRoi}
+        onClose={() => setManualRoi(null)}
+        title="Manual ROI override"
+        subtitle="Override auto-generated ROI for a specific date"
         footer={
           <>
-            <button type="button" onClick={() => setRoiForm(null)} className={`${btnGhost} flex-1`}>Cancel</button>
-            <button type="button" onClick={handleSaveRoi} className={`${btnPrimary} flex-1`}>
-              {dayCount > 1 ? `Save ${dayCount} days` : roiPreview?.updates ? "Update ROI" : "Post ROI"}
-            </button>
+            <button type="button" onClick={() => setManualRoi(null)} className={`${btnGhost} flex-1`}>Cancel</button>
+            <button type="button" onClick={handleSaveManualRoi} className={`${btnPrimary} flex-1`}>Save</button>
           </>
         }
       >
-        {roiForm && roiPreview && (
+        {manualRoi && (
           <div className="space-y-4 pb-2">
-            {/* day rows */}
-            <div className="space-y-2">
-              <div className="grid grid-cols-[1fr_1fr_auto] gap-2 px-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                <span>Date</span>
-                <span>ROI (%) · negative = loss</span>
-                <span className="w-7" />
-              </div>
-              {roiForm.rows.map((r, idx) => {
-                const info = roiPreview.items[idx];
-                return (
-                  <div key={idx} className="space-y-1">
-                    <div className="grid grid-cols-[1fr_1fr_auto] items-center gap-2">
-                      <input
-                        className={inputCls}
-                        type="date"
-                        max={today}
-                        value={r.date}
-                        onChange={(e) => changeRowDate(idx, e.target.value)}
-                      />
-                      <input
-                        className={inputCls}
-                        type="number"
-                        step="0.01"
-                        min="-100"
-                        placeholder="e.g. 0.45 or -0.8"
-                        value={r.roi}
-                        onChange={(e) => changeRowRoi(idx, e.target.value)}
-                        autoFocus={idx === 0}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeRow(idx)}
-                        disabled={roiForm.rows.length === 1}
-                        aria-label="Remove day"
-                        className="grid size-7 place-items-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-30"
-                      >
-                        <X className="size-3.5" />
-                      </button>
-                    </div>
-                    <div className="flex items-center justify-between px-1 text-[11px]">
-                      <span className="text-muted-foreground">
-                        {info.investors} investor{info.investors === 1 ? "" : "s"}
-                        {info.existing ? ` · update (was ${pctText(info.existing.roi)})` : ""}
-                      </span>
-                      <span className={`font-semibold ${tone(info.credit)}`}>{signed(info.credit)}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* add more days */}
-            <div className="space-y-3 rounded-2xl border border-border p-3">
-              <button type="button" onClick={addDay} className={`${btnSmall} w-full`}>
-                <Plus className="size-3" /> Add previous day
-              </button>
-              <div className="grid grid-cols-[1fr_1fr_auto] items-end gap-2">
-                <Field label="Range from">
-                  <input
-                    className={inputCls}
-                    type="date"
-                    max={today}
-                    value={roiForm.rangeFrom}
-                    onChange={(e) => patchRoiForm({ rangeFrom: e.target.value })}
-                  />
-                </Field>
-                <Field label="Range to">
-                  <input
-                    className={inputCls}
-                    type="date"
-                    max={today}
-                    value={roiForm.rangeTo}
-                    onChange={(e) => patchRoiForm({ rangeTo: e.target.value })}
-                  />
-                </Field>
-                <button type="button" onClick={addRange} className={`${btnSmall} h-10`}>
-                  Add range
-                </button>
-              </div>
-              <p className="text-[11px] text-muted-foreground">
-                A range adds one row per day (max 31). Fill in each day’s ROI above.
-              </p>
-            </div>
-
-            {/* summary */}
-            <div className="space-y-2 rounded-2xl bg-background p-3">
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Days</span>
-                <span className="font-medium text-foreground">
-                  {dayCount}
-                  {roiPreview.updates ? ` (${roiPreview.updates} update${roiPreview.updates === 1 ? "" : "s"})` : ""}
-                </span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Total across all days</span>
-                <span className={`font-semibold ${tone(roiPreview.totalCredit)}`}>{signed(roiPreview.totalCredit)}</span>
-              </div>
-              {roiPreview.updates > 0 && (
-                <p className="pt-1 text-[11px] text-muted-foreground">
-                  Days that were already posted only apply the difference, so nobody is credited twice.
-                </p>
-              )}
-            </div>
-
-            {roiHistory.length > 0 && (
-              <div>
-                <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                  Recent entries · click to add to the list
-                </p>
-                <div className="divide-y divide-border rounded-2xl border border-border">
-                  {roiHistory.map((e) => (
-                    <button
-                      key={e.id}
-                      type="button"
-                      onClick={() => {
-                        if (roiForm.rows.some((r) => r.date === e.date)) return;
-                        patchRoiForm({ rows: sortDesc([...roiForm.rows, rowFor(roiForm.strategyId, e.date)]) });
-                      }}
-                      className="flex w-full items-center justify-between px-3 py-2 text-left text-xs outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      <span className="text-muted-foreground">{e.date}</span>
-                      <span className="font-medium text-foreground">{pctText(e.roi)}</span>
-                      <span className={`font-semibold ${tone(e.credited)}`}>{signed(e.credited)}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {roiError && <p className="text-xs font-medium text-destructive">{roiError}</p>}
+            <Field label="Date">
+              <input
+                className={inputCls}
+                type="date"
+                max={today}
+                value={manualRoi.date}
+                onChange={(e) => setManualRoi({ ...manualRoi, date: e.target.value })}
+              />
+            </Field>
+            <Field label="ROI (%)">
+              <input
+                className={inputCls}
+                type="number"
+                step="0.01"
+                placeholder="e.g. 2.5 or -1.2"
+                value={manualRoi.roi}
+                onChange={(e) => setManualRoi({ ...manualRoi, roi: e.target.value })}
+                autoFocus
+              />
+            </Field>
+            <p className="text-[11px] text-muted-foreground">
+              This will override the auto-generated ROI for {manualRoi.date}. Negative values = loss.
+            </p>
+            {manualError && <p className="text-xs font-medium text-destructive">{manualError}</p>}
           </div>
         )}
       </Modal>
+
+      {/* Post / update daily ROI (one or many days) - REMOVED */}
 
       {/* Unlock confirm */}
       <Modal

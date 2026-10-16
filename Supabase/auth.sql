@@ -732,9 +732,24 @@ create table if not exists public.ai_trading_strategies (
   lock_days int not null default 15,
   total_roi_pct numeric(8, 4) not null default 0,
   days_running int not null default 0,
+  cycle_duration_days int not null default 30,
   active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
+);
+
+-- Daily ROI schedule for strategies (30-day auto-distribution)
+create table if not exists public.ai_trading_daily_schedule (
+  id uuid primary key default gen_random_uuid(),
+  strategy_id text not null references public.ai_trading_strategies(strategy_id) on delete cascade,
+  date date not null,
+  roi_pct numeric(8, 4) not null,
+  is_manual boolean not null default false,
+  credited boolean not null default false,
+  credited_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique(strategy_id, date)
 );
 
 -- User investments in AI strategies
@@ -748,6 +763,7 @@ create table if not exists public.ai_trading_investments (
   total_profit numeric(18, 2) not null default 0,
   lock_days int not null,
   status text not null default 'running' check (status in ('running', 'unlocked', 'withdrawn')),
+  force_unlocked boolean not null default false,
   invested_at timestamptz not null default now(),
   unlock_at timestamptz not null,
   withdrawn_at timestamptz,
@@ -770,6 +786,8 @@ create table if not exists public.ai_trades (
 );
 
 -- Indexes
+create index if not exists ai_trading_daily_schedule_strategy_idx on public.ai_trading_daily_schedule (strategy_id, date desc);
+create index if not exists ai_trading_daily_schedule_credited_idx on public.ai_trading_daily_schedule (credited, date) where credited = false;
 create index if not exists ai_trading_investments_user_idx on public.ai_trading_investments (user_id, status, created_at desc);
 create index if not exists ai_trading_investments_unlock_idx on public.ai_trading_investments (unlock_at) where status = 'running';
 create index if not exists ai_trades_user_idx on public.ai_trades (user_id, executed_at desc);
@@ -777,15 +795,20 @@ create index if not exists ai_trades_investment_idx on public.ai_trades (investm
 
 -- Enable RLS
 alter table public.ai_trading_strategies enable row level security;
+alter table public.ai_trading_daily_schedule enable row level security;
 alter table public.ai_trading_investments enable row level security;
 alter table public.ai_trades enable row level security;
 
+-- Alter existing tables to add new columns
+alter table public.ai_trading_strategies add column if not exists cycle_duration_days int not null default 30;
+alter table public.ai_trading_investments add column if not exists force_unlocked boolean not null default false;
+
 -- Insert default strategies
-insert into public.ai_trading_strategies (strategy_id, name, exchange, min_stake, lock_days, total_roi_pct, days_running) values
-  ('ema_9', '9 EMA Strategy', 'Binance', 20.00, 15, 18.40, 62),
-  ('momentum', 'Momentum Breakout', 'Binance', 40.00, 15, 24.10, 48),
-  ('grid_scalper', 'Grid Scalper Pro', 'Binance', 70.00, 15, 31.70, 35),
-  ('trend_reversal', 'Trend Reversal AI', 'Binance', 100.00, 15, 42.90, 21)
+insert into public.ai_trading_strategies (strategy_id, name, exchange, min_stake, lock_days, total_roi_pct, days_running, cycle_duration_days) values
+  ('ema_9', '9 EMA Strategy', 'Binance', 20.00, 15, 18.40, 62, 30),
+  ('momentum', 'Momentum Breakout', 'Binance', 40.00, 15, 24.10, 48, 30),
+  ('grid_scalper', 'Grid Scalper Pro', 'Binance', 70.00, 15, 31.70, 35, 30),
+  ('trend_reversal', 'Trend Reversal AI', 'Binance', 100.00, 15, 42.90, 21, 30)
 on conflict (strategy_id) do nothing;
 
 -- Function: create AI trading investment
@@ -955,7 +978,227 @@ as $$
 begin
   update public.ai_trading_investments
   set status = 'unlocked', updated_at = now()
-  where status = 'running' and unlock_at <= now();
+  where status = 'running' and force_unlocked = false and unlock_at <= now();
+end;
+$$;
+
+-- Function: force unlock investment (admin override)
+create or replace function public.force_unlock_investment(
+  p_investment_id uuid,
+  p_admin_id uuid
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.ai_trading_investments
+  set force_unlocked = true, status = 'unlocked', updated_at = now()
+  where id = p_investment_id;
+  
+  perform public.log_admin_action(p_admin_id, (select user_id from public.ai_trading_investments where id = p_investment_id), 'force_unlock_investment', jsonb_build_object('investment_id', p_investment_id));
+end;
+$$;
+
+-- Function: extend investment lock (admin)
+create or replace function public.extend_investment_lock(
+  p_investment_id uuid,
+  p_additional_days int,
+  p_admin_id uuid
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.ai_trading_investments
+  set 
+    lock_days = lock_days + p_additional_days,
+    unlock_at = unlock_at + (p_additional_days || ' days')::interval,
+    force_unlocked = false,
+    status = 'running',
+    updated_at = now()
+  where id = p_investment_id;
+  
+  perform public.log_admin_action(p_admin_id, (select user_id from public.ai_trading_investments where id = p_investment_id), 'extend_investment_lock', jsonb_build_object('investment_id', p_investment_id, 'additional_days', p_additional_days));
+end;
+$$;
+
+-- Function: generate 30-day ROI schedule (called when strategy edited)
+create or replace function public.generate_30day_roi_schedule(
+  p_strategy_id text,
+  p_total_roi_pct numeric,
+  p_days_running int
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_remaining_days int;
+  v_remaining_roi numeric;
+  v_daily_roi numeric;
+  v_variance numeric;
+  v_date date;
+  v_roi numeric;
+  v_used_roi numeric := 0;
+  v_i int;
+begin
+  -- Calculate remaining days in 30-day cycle
+  v_remaining_days := 30 - (p_days_running % 30);
+  
+  -- Calculate remaining ROI (distribute total ROI across remaining days)
+  v_remaining_roi := p_total_roi_pct / 30 * v_remaining_days;
+  
+  -- Delete non-manual future schedules
+  delete from public.ai_trading_daily_schedule
+  where strategy_id = p_strategy_id 
+    and date > current_date
+    and is_manual = false;
+  
+  -- Generate schedule for remaining days
+  v_daily_roi := v_remaining_roi / v_remaining_days;
+  
+  for v_i in 1..v_remaining_days loop
+    v_date := current_date + v_i;
+    
+    -- Add random variance (-30% to +70% of base daily ROI)
+    v_variance := (random() - 0.3) * v_daily_roi;
+    v_roi := v_daily_roi + v_variance;
+    
+    -- Adjust last day to match exact remaining ROI
+    if v_i = v_remaining_days then
+      v_roi := v_remaining_roi - v_used_roi;
+    end if;
+    
+    v_used_roi := v_used_roi + v_roi;
+    
+    -- Insert or skip if already exists
+    insert into public.ai_trading_daily_schedule (strategy_id, date, roi_pct, is_manual)
+    values (p_strategy_id, v_date, v_roi, false)
+    on conflict (strategy_id, date) do nothing;
+  end loop;
+end;
+$$;
+
+-- Function: process daily AI trading ROI (called by cron at 23:59:59 UTC)
+create or replace function public.process_daily_ai_trading_roi()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_schedule record;
+  v_investment record;
+  v_profit_delta numeric;
+  v_tx_hash text;
+  v_total_credited numeric;
+begin
+  -- Process all uncredited schedules for today
+  for v_schedule in
+    select * from public.ai_trading_daily_schedule
+    where date = current_date and credited = false
+  loop
+    v_total_credited := 0;
+    
+    -- Apply ROI to all running investments in this strategy
+    for v_investment in
+      select * from public.ai_trading_investments
+      where strategy_id = v_schedule.strategy_id 
+        and status = 'running'
+        and invested_at::date <= v_schedule.date
+    loop
+      -- Calculate profit/loss for this investment
+      v_profit_delta := (v_investment.current_value * v_schedule.roi_pct) / 100;
+      
+      -- Update investment
+      update public.ai_trading_investments
+      set
+        current_value = current_value + v_profit_delta,
+        total_profit = total_profit + v_profit_delta,
+        updated_at = now()
+      where id = v_investment.id;
+      
+      -- Add to trading wallet
+      update public.wallet_accounts
+      set balance = balance + v_profit_delta, updated_at = now()
+      where user_id = v_investment.user_id and wallet = 'trading';
+      
+      -- Record transaction
+      v_tx_hash := gen_random_uuid()::text;
+      insert into public.wallet_transactions (user_id, wallet, type, amount, status, tx_hash)
+      values (v_investment.user_id, 'trading', 'ai_trading_profit', v_profit_delta, 'completed', v_tx_hash);
+      
+      -- Record trade
+      insert into public.ai_trades (
+        investment_id, user_id, strategy_id, strategy_name, trade_size, 
+        duration_minutes, pnl, result
+      ) values (
+        v_investment.id, v_investment.user_id, v_investment.strategy_id, v_investment.strategy_name,
+        v_investment.current_value, 1440, v_profit_delta, case when v_profit_delta >= 0 then 'win' else 'loss' end
+      );
+      
+      -- Record profit for referral commission (only on gains)
+      if v_profit_delta > 0 then
+        perform public.record_profit_with_commission(v_investment.user_id, 'ai_trading', v_profit_delta);
+      end if;
+      
+      v_total_credited := v_total_credited + v_profit_delta;
+    end loop;
+    
+    -- Mark schedule as credited
+    update public.ai_trading_daily_schedule
+    set credited = true, credited_at = now(), updated_at = now()
+    where id = v_schedule.id;
+    
+    -- Update strategy stats
+    update public.ai_trading_strategies
+    set
+      total_roi_pct = total_roi_pct + v_schedule.roi_pct,
+      days_running = days_running + 1,
+      updated_at = now()
+    where strategy_id = v_schedule.strategy_id;
+    
+    -- Generate next 30-day cycle if cycle completed
+    update public.ai_trading_strategies
+    set updated_at = now()
+    where strategy_id = v_schedule.strategy_id
+      and (days_running + 1) % 30 = 0;
+      
+    if found then
+      perform public.generate_30day_roi_schedule(
+        v_schedule.strategy_id,
+        (select total_roi_pct from public.ai_trading_strategies where strategy_id = v_schedule.strategy_id),
+        (select days_running from public.ai_trading_strategies where strategy_id = v_schedule.strategy_id)
+      );
+    end if;
+  end loop;
+end;
+$$;
+
+-- Function: manually set daily ROI (admin override)
+create or replace function public.set_manual_daily_roi(
+  p_strategy_id text,
+  p_date date,
+  p_roi_pct numeric,
+  p_admin_id uuid
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.ai_trading_daily_schedule (strategy_id, date, roi_pct, is_manual)
+  values (p_strategy_id, p_date, p_roi_pct, true)
+  on conflict (strategy_id, date) 
+  do update set roi_pct = p_roi_pct, is_manual = true, updated_at = now();
+  
+  perform public.log_admin_action(p_admin_id, null, 'set_manual_daily_roi', jsonb_build_object('strategy_id', p_strategy_id, 'date', p_date, 'roi_pct', p_roi_pct));
 end;
 $$;
 
@@ -1485,6 +1728,18 @@ begin
       'unlock-ai-trading-investments',
       '0 * * * *',
       'select public.unlock_ai_trading_investments();'
+    );
+  end if;
+end $$;
+
+-- AI trading daily ROI distribution (23:59:59 UTC daily)
+do $$
+begin
+  if not exists (select 1 from cron.job where jobname = 'process-daily-ai-trading-roi') then
+    perform cron.schedule(
+      'process-daily-ai-trading-roi',
+      '59 23 * * *',
+      'select public.process_daily_ai_trading_roi();'
     );
   end if;
 end $$;
