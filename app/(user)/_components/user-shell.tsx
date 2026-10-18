@@ -296,16 +296,15 @@ export function UserShell({ active: initialActive, children }: UserShellProps) {
                             children ? openSection === label : undefined
                           }
                           icon={<Icon className="size-4" />}
-                          onSelect={() => {
-                            setOpenSection((current) => {
-                              if (!children) {
-                                setActive(label);
-                                navigate(label);
-                                return null;
-                              }
-                              return current === label ? null : label;
-                            });
-                          }}
+                           onSelect={() => {
+                             if (!children) {
+                               setActive(label);
+                               setOpenSection(null);
+                               navigate(label);
+                               return;
+                             }
+                             setOpenSection((current) => current === label ? null : label);
+                           }}
                         >
                           {label}
                         </AnimatedSidebarMenuButton>
