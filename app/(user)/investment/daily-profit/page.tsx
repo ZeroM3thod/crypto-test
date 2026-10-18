@@ -126,6 +126,13 @@ function fmt(n: number, decimals = 2) {
   return "$" + n.toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
+function formatDuration(seconds: number) {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainder = seconds % 60;
+  return [hours && `${hours}h`, minutes && `${minutes}m`, remainder && `${remainder}s`].filter(Boolean).join(" ") || "0s";
+}
+
 function useCountdown(targetMs: number, repeatMs = 0) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -217,7 +224,7 @@ function PlanCard({
       <ul className="mb-4 space-y-2.5">
         {[
           { label: "Minimum", value: fmt(plan.minimum) },
-          { label: "Cancel policy", value: `After ${plan.lockPeriodSec} seconds` },
+          { label: "Cancel policy", value: `After ${formatDuration(plan.lockPeriodSec)}` },
           { label: "Payout", value: "Principal + profits" },
           { label: "Return type", value: "Simple interest" },
         ].map((item) => (
@@ -781,6 +788,7 @@ export default function DailyProfitPage() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [activePlans, setActivePlans] = useState<ActivePlan[]>([]);
   const [historyRows, setHistoryRows] = useState<HistoryRow[]>([]);
+  const [walletBalance, setWalletBalance] = useState(0);
   const [loading, setLoading] = useState(true);
 
   // Modals
@@ -815,7 +823,10 @@ export default function DailyProfitPage() {
   }, []);
 
   useEffect(() => {
-    const refresh = () => fetch("/api/investment/daily-profit/stats", { cache: "no-store" }).then((r) => r.json()).then((data) => {
+    const refresh = () => Promise.all([
+      fetch("/api/investment/daily-profit/stats", { cache: "no-store" }).then((r) => r.json()),
+      fetch("/api/wallet", { cache: "no-store" }).then((r) => r.json()),
+    ]).then(([data, walletData]) => {
       setActivePlans(data.investments.map((inv: any) => ({
         id: inv.id, planId: inv.plan_id, planName: inv.plan_name, rate: Number(inv.daily_rate), invested: Number(inv.amount),
         startedAt: new Date(inv.started_at), creditsEarned: inv.credits_earned, profitPerCycle: Number(inv.profit_per_cycle),
@@ -827,6 +838,8 @@ export default function DailyProfitPage() {
         invested: Number(h.invested_amount), rate: Number(h.daily_rate), profit: Number(h.profit_amount),
         walletCredited: "Investment Wallet", cumulative: Number(h.cumulative_profit), status: h.status,
       })));
+      const investmentWallet = walletData.accounts?.find((wallet: any) => wallet.id === "investment");
+      setWalletBalance(Number(investmentWallet?.balance ?? 0));
       setLoading(false);
     }).catch(console.error);
     refresh();
@@ -837,10 +850,6 @@ export default function DailyProfitPage() {
   // Derived stats
   const totalInvested = activePlans.reduce((s, p) => s + p.invested, 0);
   const totalEarnedAll = historyRows.reduce((s, r) => s + r.profit, 0);
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const todayProfit = historyRows
-    .filter((r) => r.date === todayStr)
-    .reduce((s, r) => s + r.profit, 0);
 
   async function handleInvestConfirm() {
     if (!investTarget) return;
@@ -947,9 +956,9 @@ export default function DailyProfitPage() {
                 delta: { value: "All time", positive: true },
               },
               {
-                label: "Today's Profit",
-                value: todayProfit > 0 ? `+${fmt(todayProfit)}` : "$0.00",
-                delta: { value: "Credited today", positive: true },
+                label: "Investment Wallet Balance",
+                value: fmt(walletBalance),
+                delta: { value: "Available to invest", positive: true },
               },
               {
                 label: "Active Plans",
