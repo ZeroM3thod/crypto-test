@@ -6,7 +6,7 @@ import {
   btnDanger, btnGhost, btnPrimary, btnSmall, fmt, inputCls, workingTime,
 } from "@/app/(admin)/_components/admin-ui";
 import { Table } from "@/components/motion/table";
-import { Bot, Calendar, Lock, LockOpen, Pencil, Percent, Plus, Search, TrendingUp, Users, Wallet, X } from "lucide-react";
+import { Bot, Calendar, Clock, History, Lock, LockOpen, Pencil, Percent, Plus, Search, TrendingUp, Users, Wallet, X } from "lucide-react";
 import { useMemo, useState, useEffect } from "react";
 
 // ── Types ────────────────────────────────────────────────────────────────
@@ -25,6 +25,7 @@ type DailyEntry = {
   id: string;
   strategyId: string;
   date: string;         // YYYY-MM-DD
+  time?: string;        // HH:mm it was added to users (if provided)
   roi: number;          // % entered by admin for that day (negative = loss)
   credited: number;     // total $ credited (or deducted if negative) for that day
 };
@@ -70,90 +71,119 @@ type StrategyForm = {
   minStake: string;
   lockDays: string;
   cycleTotalRoi: string; // Total ROI for 30-day cycle
+  daysRunning: string;   // total days the strategy has been running (edit only)
+  totalRoi: string;      // total ROI % since inception (edit only)
 };
 
 const EMPTY_FORM: StrategyForm = {
   id: null, name: "", exchange: "Binance", minStake: "", lockDays: "15",
-  cycleTotalRoi: "0",
+  cycleTotalRoi: "0", daysRunning: "0", totalRoi: "0",
 };
 
 const toForm = (s: Strategy): StrategyForm => ({
   id: s.id, name: s.name, exchange: s.exchange, minStake: String(s.minStake),
   lockDays: String(s.lockDays), cycleTotalRoi: String(s.totalRoi),
+  daysRunning: String(s.daysRunning), totalRoi: String(s.totalRoi),
 });
 
 // ── Strategy card ────────────────────────────────────────────────────────
+// Daily ROI is set per day with the time it is credited to users (no 30-day cycle ROI).
 function AdminStrategyCard({
-  strategy, investorCount, totalStaked, onEdit, onViewUsers, onPostRoi,
+  strategy, investorCount, totalStaked, todayRoi = null, todayRoiTime = null, onEdit, onViewUsers, onPostRoi, onRoiList,
 }: {
   strategy: Strategy;
   investorCount: number;
   totalStaked: number;
+  todayRoi?: number | null;      // today's daily ROI % (null = not set yet)
+  todayRoiTime?: string | null;  // time it is / was credited to users, e.g. "09:00 AM"
   onEdit: () => void;
   onViewUsers: () => void;
   onPostRoi: () => void;
+  onRoiList?: () => void;
 }) {
+  const isSet = todayRoi !== null;
+  const estCredit = isSet ? round2((totalStaked * (todayRoi as number)) / 100) : 0;
+
   return (
     <Card>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-foreground/5 text-foreground">
-            <Bot className="size-4" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-card-foreground">{strategy.name}</p>
-            <p className="text-[11px] text-muted-foreground">{strategy.exchange}</p>
-          </div>
+      {/* Header */}
+      <div className="flex items-center gap-2.5">
+        <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-foreground text-background">
+          <Bot className="size-4" />
         </div>
-        <Badge label="Auto" tone="success" />
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-card-foreground">{strategy.name}</p>
+          <p className="text-[11px] text-muted-foreground">{strategy.exchange} · Running {strategy.daysRunning}d</p>
+        </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3">
+      {/* Today's daily ROI */}
+      <div className="mt-4 rounded-2xl bg-background p-3.5">
+        <div className="flex items-center justify-between">
+          <p className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            <Percent className="size-3" /> Today&apos;s daily ROI
+          </p>
+          {isSet ? (
+            <Badge label="Scheduled" tone="success" />
+          ) : (
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">Not set</span>
+          )}
+        </div>
+        <div className="mt-2 flex items-end justify-between gap-2">
+          <p className={`text-2xl font-semibold tracking-tight ${isSet ? tone(todayRoi as number) : "text-muted-foreground"}`}>
+            {isSet ? pctText(todayRoi as number) : "—"}
+          </p>
+          <p className="flex items-center gap-1 pb-1 text-xs text-muted-foreground">
+            <Clock className="size-3" /> {todayRoiTime ?? "No time set"}
+          </p>
+        </div>
+        {isSet && (
+          <p className={`mt-1 text-[11px] ${tone(estCredit)}`}>
+            ≈ {signed(estCredit)} to {investorCount} investor{investorCount === 1 ? "" : "s"}
+          </p>
+        )}
+      </div>
+
+      {/* Details */}
+      <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-3 px-1">
         <div>
           <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Min. Stake</p>
           <p className="mt-0.5 text-sm font-semibold text-foreground">${fmt(strategy.minStake)}</p>
         </div>
         <div>
           <p className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-            <Percent className="size-3" /> Total ROI
+            <Lock className="size-3" /> Lock Period
           </p>
-          <p className={`mt-0.5 text-sm font-semibold ${tone(strategy.totalRoi)}`}>
-            {strategy.totalRoi >= 0 ? "+" : ""}{strategy.totalRoi.toFixed(1)}%
-          </p>
+          <p className="mt-0.5 text-sm font-semibold text-foreground">{strategy.lockDays} days</p>
         </div>
         <div>
           <p className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-            <Calendar className="size-3" /> Days Running
+            <Users className="size-3" /> Investors
           </p>
-          <p className="mt-0.5 text-sm font-semibold text-foreground">{strategy.daysRunning}</p>
+          <p className="mt-0.5 text-sm font-semibold text-foreground">{investorCount}</p>
         </div>
         <div>
-          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Lock Period</p>
-          <p className="mt-0.5 text-sm font-semibold text-foreground">{strategy.lockDays} days</p>
+          <p className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            <Wallet className="size-3" /> Total staked
+          </p>
+          <p className="mt-0.5 text-sm font-semibold text-foreground">${fmt(totalStaked)}</p>
         </div>
       </div>
 
-      <div className="mt-4 space-y-2 rounded-2xl bg-background p-3">
-        <div className="flex justify-between text-xs">
-          <span className="text-muted-foreground">Investors</span>
-          <span className="font-medium text-foreground">{investorCount}</span>
-        </div>
-        <div className="flex justify-between text-xs">
-          <span className="text-muted-foreground">Total staked</span>
-          <span className="font-medium text-foreground">${fmt(totalStaked)}</span>
-        </div>
-      </div>
-
+      {/* Actions */}
       <button type="button" onClick={onPostRoi} className={`${btnPrimary} mt-4 h-10 w-full text-xs`}>
-        <TrendingUp className="size-3.5" /> Manual override today
+        <TrendingUp className="size-3.5" /> Set daily ROI
       </button>
 
-      <div className="mt-2 flex gap-2">
-        <button type="button" onClick={onViewUsers} className={`${btnGhost} h-10 flex-1 text-xs`}>
-          <Users className="size-3.5" /> Users
+      <div className="mt-2 grid grid-cols-3 gap-2">
+        <button type="button" onClick={onRoiList} className={`${btnGhost} h-14 flex-col gap-1 px-1 text-[11px]`}>
+          <History className="size-4" /> ROI list
         </button>
-        <button type="button" onClick={onEdit} className={`${btnGhost} h-10 flex-1 text-xs`}>
-          <Pencil className="size-3.5" /> Edit
+        <button type="button" onClick={onViewUsers} className={`${btnGhost} h-14 flex-col gap-1 px-1 text-[11px]`}>
+          <Users className="size-4" /> Users
+        </button>
+        <button type="button" onClick={onEdit} className={`${btnGhost} h-14 flex-col gap-1 px-1 text-[11px]`}>
+          <Pencil className="size-4" /> Edit
         </button>
       </div>
     </Card>
@@ -171,8 +201,12 @@ export function AiTradingManagement() {
   const [form, setForm] = useState<StrategyForm | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const [manualRoi, setManualRoi] = useState<{ strategyId: string; date: string; roi: string } | null>(null);
+  const [manualRoi, setManualRoi] = useState<{ strategyId: string; date: string; time: string; roi: string } | null>(null);
   const [manualError, setManualError] = useState<string | null>(null);
+
+  const [roiList, setRoiList] = useState<{
+    strategyId: string; entries: DailyEntry[]; loading: boolean; error: string | null;
+  } | null>(null);
 
   const [selectedId, setSelectedId] = useState<string>("");
   const [query, setQuery] = useState("");
@@ -333,7 +367,7 @@ export function AiTradingManagement() {
   // ── Manual ROI override (single day) ──
   function openManualRoi(strategyId: string) {
     setManualError(null);
-    setManualRoi({ strategyId, date: today, roi: "" });
+    setManualRoi({ strategyId, date: today, time: "09:00", roi: "" });
   }
 
   async function handleSaveManualRoi() {
@@ -357,6 +391,32 @@ export function AiTradingManagement() {
     } catch (err) {
       console.error(err);
       setManualError("Save failed");
+    }
+  }
+
+  // ── ROI list (previous daily ROI with date) ──
+  async function openRoiList(strategyId: string) {
+    setRoiList({ strategyId, entries: [], loading: true, error: null });
+    try {
+      const res = await fetch(`/api/admin/ai-trading/strategies/${strategyId}/daily-roi`);
+      if (!res.ok) throw new Error("Load failed");
+      const data = await res.json();
+      const entries: DailyEntry[] = (data.entries || data.daily_roi || [])
+        .map((e: any, i: number) => ({
+          id: String(e.id ?? `${e.date}-${i}`),
+          strategyId,
+          date: String(e.date).slice(0, 10),
+          time: e.time ?? undefined,
+          roi: parseFloat(e.roi ?? e.roi_pct),
+          credited: parseFloat(e.credited ?? e.total_credited ?? 0) || 0,
+        }))
+        .sort((a: DailyEntry, b: DailyEntry) =>
+          `${b.date} ${b.time ?? ""}`.localeCompare(`${a.date} ${a.time ?? ""}`)
+        );
+      setRoiList((prev) => (prev && prev.strategyId === strategyId ? { ...prev, entries, loading: false } : prev));
+    } catch (err) {
+      console.error(err);
+      setRoiList((prev) => (prev ? { ...prev, loading: false, error: "Couldn't load ROI list" } : prev));
     }
   }
 
@@ -510,6 +570,7 @@ export function AiTradingManagement() {
                   investorCount={inv.length}
                   totalStaked={inv.reduce((a, i) => a + i.invested, 0)}
                   onPostRoi={() => openManualRoi(s.id)}
+                  onRoiList={() => openRoiList(s.id)}
                   onEdit={() => { setFormError(null); setForm(toForm(s)); }}
                   onViewUsers={() => {
                     setSelectedId(s.id);
@@ -607,13 +668,17 @@ export function AiTradingManagement() {
               <Field label="Lock period (days)">
                 <input className={inputCls} type="number" min="0" value={form.lockDays} onChange={(e) => set("lockDays", e.target.value)} />
               </Field>
-              <Field label="30-Day Cycle Total ROI (%)">
-                <input className={inputCls} type="number" step="0.1" value={form.cycleTotalRoi} onChange={(e) => set("cycleTotalRoi", e.target.value)} />
-              </Field>
+              {form.id && (
+                <>
+                  <Field label="Total days running">
+                    <input className={inputCls} type="number" min="0" step="1" value={form.daysRunning} onChange={(e) => set("daysRunning", e.target.value)} />
+                  </Field>
+                  <Field label="Total ROI (%)">
+                    <input className={inputCls} type="number" step="0.01" placeholder="e.g. 12.5 or -3" value={form.totalRoi} onChange={(e) => set("totalRoi", e.target.value)} />
+                  </Field>
+                </>
+              )}
             </div>
-            <p className="text-[11px] text-muted-foreground">
-              Enter the total ROI % for a 30-day cycle. System auto-distributes it daily with random variance. Use "Manual override" button to adjust specific days.
-            </p>
             {formError && <p className="text-xs font-medium text-destructive">{formError}</p>}
           </div>
         )}
@@ -624,7 +689,7 @@ export function AiTradingManagement() {
         open={!!manualRoi}
         onClose={() => setManualRoi(null)}
         title="Manual ROI override"
-        subtitle="Override auto-generated ROI for a specific date"
+        subtitle="Set the daily ROI and the time it is added to users"
         footer={
           <>
             <button type="button" onClick={() => setManualRoi(null)} className={`${btnGhost} flex-1`}>Cancel</button>
@@ -634,15 +699,25 @@ export function AiTradingManagement() {
       >
         {manualRoi && (
           <div className="space-y-4 pb-2">
-            <Field label="Date">
-              <input
-                className={inputCls}
-                type="date"
-                max={today}
-                value={manualRoi.date}
-                onChange={(e) => setManualRoi({ ...manualRoi, date: e.target.value })}
-              />
-            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Date">
+                <input
+                  className={inputCls}
+                  type="date"
+                  max={today}
+                  value={manualRoi.date}
+                  onChange={(e) => setManualRoi({ ...manualRoi, date: e.target.value })}
+                />
+              </Field>
+              <Field label="Time">
+                <input
+                  className={inputCls}
+                  type="time"
+                  value={manualRoi.time}
+                  onChange={(e) => setManualRoi({ ...manualRoi, time: e.target.value })}
+                />
+              </Field>
+            </div>
             <Field label="ROI (%)">
               <input
                 className={inputCls}
@@ -655,9 +730,75 @@ export function AiTradingManagement() {
               />
             </Field>
             <p className="text-[11px] text-muted-foreground">
-              This will override the auto-generated ROI for {manualRoi.date}. Negative values = loss.
+              This ROI will be added to users on {manualRoi.date} at {manualRoi.time || "the selected time"}. Negative values = loss.
             </p>
             {manualError && <p className="text-xs font-medium text-destructive">{manualError}</p>}
+          </div>
+        )}
+      </Modal>
+
+      {/* ROI list (previous daily ROI) */}
+      <Modal
+        open={!!roiList}
+        onClose={() => setRoiList(null)}
+        title="ROI list"
+        subtitle={roiList ? strategies.find((x) => x.id === roiList.strategyId)?.name : undefined}
+        footer={
+          <button type="button" onClick={() => setRoiList(null)} className={`${btnGhost} flex-1`}>Close</button>
+        }
+      >
+        {roiList && (
+          <div className="space-y-3 pb-2">
+            {roiList.loading ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">Loading…</p>
+            ) : roiList.error ? (
+              <p className="py-8 text-center text-sm font-medium text-destructive">{roiList.error}</p>
+            ) : roiList.entries.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-8 text-center">
+                <History className="size-6 text-muted-foreground/50" />
+                <p className="text-sm text-muted-foreground">No ROI posted yet.</p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-2 rounded-2xl bg-background p-3">
+                  <div>
+                    <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Entries</p>
+                    <p className="mt-0.5 text-sm font-semibold text-foreground">{roiList.entries.length}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Total ROI</p>
+                    <p className={`mt-0.5 text-sm font-semibold ${tone(roiList.entries.reduce((a, e) => a + e.roi, 0))}`}>
+                      {pctText(round2(roiList.entries.reduce((a, e) => a + e.roi, 0)))}
+                    </p>
+                  </div>
+                </div>
+
+                <ul className="max-h-80 divide-y divide-border overflow-y-auto rounded-2xl border border-border">
+                  {roiList.entries.map((e) => (
+                    <li key={e.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-foreground">
+                          {new Date(`${e.date}T00:00:00Z`).toLocaleDateString("en-GB", {
+                            day: "2-digit", month: "short", year: "numeric", timeZone: "UTC",
+                          })}
+                        </p>
+                        {e.time && (
+                          <p className="mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground">
+                            <Clock className="size-3" /> {e.time}
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <p className={`text-sm font-semibold ${tone(e.roi)}`}>{pctText(e.roi)}</p>
+                        {e.credited !== 0 && (
+                          <p className={`text-[10px] ${tone(e.credited)}`}>{signed(e.credited)}</p>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
           </div>
         )}
       </Modal>
