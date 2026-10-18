@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { bad, getSession, supabase, q } from "@/lib/auth/backend";
+import { bad, getSession, supabase } from "@/lib/auth/backend";
 
 export async function GET(req: NextRequest) {
   const session = await getSession(req);
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => null);
-  const { plan_id, name, daily_rate, minimum_amount, badge_label, cancel_policy_hours, profit_interval_seconds } = body;
+  const { plan_id, name, daily_rate, minimum_amount, badge_label, cancel_policy_hours, cancel_policy_seconds, profit_interval_seconds } = body;
 
   await supabase("daily_profit_plans", {
     method: "POST",
@@ -34,8 +34,9 @@ export async function POST(req: NextRequest) {
       daily_rate,
       minimum_amount,
       badge_label,
-      cancel_policy_hours: cancel_policy_hours || 24,
-      profit_interval_seconds: profit_interval_seconds || 86400,
+      cancel_policy_hours: cancel_policy_seconds == null ? (cancel_policy_hours ?? 24) : Math.ceil(cancel_policy_seconds / 3600),
+      cancel_policy_seconds: cancel_policy_seconds ?? (cancel_policy_hours ?? 24) * 3600,
+      profit_interval_seconds: profit_interval_seconds ?? 86400,
       active: true,
     }),
   });

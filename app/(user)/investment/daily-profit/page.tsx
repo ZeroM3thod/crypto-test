@@ -102,6 +102,8 @@ type ActivePlan = {
   creditsEarned: number;
   profitPerCycle: number;
   nextCreditAt: Date;
+  profitIntervalSec: number;
+  lockPeriodSec: number;
 };
 
 type HistoryRow = {
@@ -215,7 +217,7 @@ function PlanCard({
       <ul className="mb-4 space-y-2.5">
         {[
           { label: "Minimum", value: fmt(plan.minimum) },
-          { label: "Cancel policy", value: "After 24 hours" },
+          { label: "Cancel policy", value: `After ${plan.lockPeriodSec} seconds` },
           { label: "Payout", value: "Principal + profits" },
           { label: "Return type", value: "Simple interest" },
         ].map((item) => (
@@ -285,7 +287,7 @@ function ActivePlanCard({
   plan: ActivePlan;
   onCancel: (plan: ActivePlan) => void;
 }) {
-  const cancelUnlockMs = plan.startedAt.getTime() + 24 * 60 * 60 * 1000;
+  const cancelUnlockMs = plan.startedAt.getTime() + plan.lockPeriodSec * 1000;
   const nextCreditMs = plan.nextCreditAt.getTime();
 
   const cancelCountdown = useCountdown(cancelUnlockMs);
@@ -298,7 +300,7 @@ function ActivePlanCard({
 
   const lastCreditDate =
     plan.creditsEarned > 0
-      ? new Date(plan.startedAt.getTime() + plan.creditsEarned * 24 * 60 * 60 * 1000)
+      ? new Date(plan.startedAt.getTime() + plan.creditsEarned * plan.profitIntervalSec * 1000)
       : null;
 
   return (
@@ -799,6 +801,8 @@ export default function DailyProfitPage() {
           name: p.name,
           rate: parseFloat(p.daily_rate),
           minimum: parseFloat(p.minimum_amount),
+          profitIntervalSec: p.profit_interval_seconds,
+          lockPeriodSec: p.cancel_policy_seconds ?? p.cancel_policy_hours * 3600,
           icon: getIcon(p.plan_id),
           badge: p.badge_label,
           accentClass: "border-border",
@@ -827,6 +831,8 @@ export default function DailyProfitPage() {
           creditsEarned: inv.credits_earned,
           profitPerCycle: parseFloat(inv.profit_per_cycle),
           nextCreditAt: new Date(inv.next_credit_at),
+          profitIntervalSec: inv.profit_interval_seconds ?? 86400,
+          lockPeriodSec: inv.cancel_policy_seconds ?? inv.cancel_policy_hours * 3600,
         }));
         setActivePlans(active);
 
@@ -888,12 +894,14 @@ export default function DailyProfitPage() {
         invested: parseFloat(inv.amount),
         startedAt: new Date(inv.started_at),
         creditsEarned: inv.credits_earned,
-        profitPerCycle: parseFloat(inv.profit_per_cycle),
-        nextCreditAt: new Date(inv.next_credit_at),
+          profitPerCycle: parseFloat(inv.profit_per_cycle),
+          nextCreditAt: new Date(inv.next_credit_at),
+          profitIntervalSec: inv.profit_interval_seconds ?? 86400,
+          lockPeriodSec: inv.cancel_policy_seconds ?? inv.cancel_policy_hours * 3600,
       }));
       setActivePlans(active);
       
-      setToast(`${plan.name} activated! First profit credit in 24 hours.`);
+      setToast(`${plan.name} activated!`);
       setInvestTarget(null);
     } catch (err) {
       console.error(err);

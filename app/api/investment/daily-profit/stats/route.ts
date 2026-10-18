@@ -9,6 +9,10 @@ export async function GET(req: NextRequest) {
   const investments = await supabase<any[]>(
     `daily_profit_investments?select=*&user_id=eq.${q(session.user.id)}&status=eq.active`
   );
+  const planIds = [...new Set(investments.map((inv) => inv.plan_id))];
+  const plans = planIds.length ? await supabase<any[]>(`daily_profit_plans?select=plan_id,cancel_policy_seconds,cancel_policy_hours,profit_interval_seconds&plan_id=in.(${planIds.map(q).join(",")})`) : [];
+  const planSettings = new Map(plans.map((plan) => [plan.plan_id, plan]));
+  for (const investment of investments) Object.assign(investment, planSettings.get(investment.plan_id));
 
   // Get all-time profit history
   const history = await supabase<any[]>(

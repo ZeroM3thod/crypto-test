@@ -10,6 +10,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { id } = await params;
   const body = await req.json().catch(() => null);
+  if (body?.cancel_policy_seconds != null) body.cancel_policy_hours = Math.ceil(body.cancel_policy_seconds / 3600);
 
   await supabase(`daily_profit_plans?id=eq.${q(id)}`, {
     method: "PATCH",

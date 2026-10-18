@@ -499,6 +499,7 @@ create table if not exists public.daily_profit_plans (
   minimum_amount numeric(18, 2) not null check (minimum_amount > 0),
   badge_label text not null,
   cancel_policy_hours int not null default 24,
+  cancel_policy_seconds int not null default 86400,
   profit_interval_seconds int not null default 86400,
   active boolean not null default true,
   created_at timestamptz not null default now(),
@@ -519,10 +520,16 @@ create table if not exists public.daily_profit_investments (
   total_profit numeric(18, 2) not null default 0,
   started_at timestamptz not null default now(),
   next_credit_at timestamptz not null,
+  profit_interval_seconds int not null default 86400,
+  cancel_policy_seconds int not null default 86400,
   cancelled_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.daily_profit_plans add column if not exists cancel_policy_seconds int not null default 86400;
+alter table public.daily_profit_investments add column if not exists profit_interval_seconds int not null default 86400;
+alter table public.daily_profit_investments add column if not exists cancel_policy_seconds int not null default 86400;
 
 -- Daily profit history (each credit event)
 create table if not exists public.daily_profit_history (
@@ -610,9 +617,9 @@ begin
 
   -- Create investment
   insert into public.daily_profit_investments (
-    user_id, plan_id, plan_name, amount, daily_rate, profit_per_cycle, next_credit_at
+    user_id, plan_id, plan_name, amount, daily_rate, profit_per_cycle, next_credit_at, profit_interval_seconds, cancel_policy_seconds
   ) values (
-    p_user_id, v_plan.plan_id, v_plan.name, p_amount, v_plan.daily_rate, v_profit_per_cycle, v_next_credit_at
+    p_user_id, v_plan.plan_id, v_plan.name, p_amount, v_plan.daily_rate, v_profit_per_cycle, v_next_credit_at, v_plan.profit_interval_seconds, v_plan.cancel_policy_seconds
   ) returning id into v_investment_id;
 
   return v_investment_id;
@@ -642,9 +649,8 @@ begin
     raise exception 'Investment not found or already cancelled';
   end if;
 
-  -- Check 24h lock period
-  if now() < v_investment.started_at + interval '24 hours' then
-    raise exception 'Cannot cancel before 24 hours';
+  if now() < v_investment.started_at + (v_investment.cancel_policy_seconds || ' seconds')::interval then
+    raise exception 'Cannot cancel before lock period ends';
   end if;
 
   -- Calculate total return
@@ -693,7 +699,7 @@ begin
     set
       credits_earned = credits_earned + 1,
       total_profit = total_profit + v_investment.profit_per_cycle,
-      next_credit_at = next_credit_at + interval '86400 seconds',
+      next_credit_at = next_credit_at + (v_investment.profit_interval_seconds || ' seconds')::interval,
       updated_at = now()
     where id = v_investment.id;
 

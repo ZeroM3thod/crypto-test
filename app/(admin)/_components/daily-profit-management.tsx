@@ -208,7 +208,7 @@ export function DailyProfitManagement() {
           rate: parseFloat(p.daily_rate),
           minimum: parseFloat(p.minimum_amount),
           profitIntervalSec: p.profit_interval_seconds,
-          lockPeriodSec: p.cancel_policy_hours * 3600,
+          lockPeriodSec: p.cancel_policy_seconds ?? p.cancel_policy_hours * 3600,
           payout: "Principal + profits",
           returnType: "Simple interest",
           active: p.active,
@@ -282,7 +282,7 @@ export function DailyProfitManagement() {
             daily_rate: rate,
             minimum_amount: minimum,
             profit_interval_seconds: intervalSec,
-            cancel_policy_hours: Math.floor(lockSec / 3600),
+            cancel_policy_seconds: lockSec,
             active: form.active,
           }),
         });
@@ -316,7 +316,7 @@ export function DailyProfitManagement() {
             daily_rate: rate,
             minimum_amount: minimum,
             profit_interval_seconds: intervalSec,
-            cancel_policy_hours: Math.floor(lockSec / 3600),
+            cancel_policy_seconds: lockSec,
           }),
         });
 
@@ -329,7 +329,7 @@ export function DailyProfitManagement() {
           rate: parseFloat(p.daily_rate),
           minimum: parseFloat(p.minimum_amount),
           profitIntervalSec: p.profit_interval_seconds,
-          lockPeriodSec: p.cancel_policy_hours * 3600,
+          lockPeriodSec: p.cancel_policy_seconds ?? p.cancel_policy_hours * 3600,
           payout: "Principal + profits",
           returnType: "Simple interest",
           active: p.active,
