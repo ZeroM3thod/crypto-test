@@ -802,7 +802,6 @@ export default function DailyProfitPage() {
           name: p.name,
           rate: parseFloat(p.daily_rate),
           minimum: parseFloat(p.minimum_amount),
-          lockPeriodSec: p.cancel_policy_seconds ?? p.cancel_policy_hours * 3600,
           profitIntervalSec: p.profit_interval_seconds,
           lockPeriodSec: p.cancel_policy_seconds ?? p.cancel_policy_hours * 3600,
           icon: getIcon(p.plan_id),
