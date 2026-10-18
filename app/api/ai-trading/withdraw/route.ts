@@ -8,19 +8,21 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   const investmentId = String(body?.investmentId || "").trim();
 
-  if (!investmentId) return bad("investmentId required");
+  if (!/^[0-9a-f-]{36}$/i.test(investmentId)) return bad("Valid investmentId required");
 
-  // Call DB function to withdraw investment
-  await supabase("rpc/withdraw_ai_trading_investment", {
+  // Return current investment state with useful pre-migration diagnostics.
+  try {
+    await supabase("rpc/withdraw_ai_trading_investment", {
     method: "POST",
     headers: { Prefer: "return=minimal" },
     body: JSON.stringify({
       p_user_id: session.user.id,
       p_investment_id: investmentId,
     }),
-  }).catch((err: Error) => {
-    return bad(err.message || "Withdrawal failed");
-  });
+    });
+  } catch (err) {
+    return bad(err instanceof Error ? err.message : "Withdrawal failed", 400);
+  }
 
   return Response.json({ success: true });
 }

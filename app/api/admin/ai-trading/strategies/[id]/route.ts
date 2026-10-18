@@ -11,34 +11,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { id: strategyId } = await params;
   const body = await req.json().catch(() => null);
+  if (!body || typeof body !== "object") return bad("Invalid strategy", 400);
+  const allowed = ["name", "exchange", "min_stake", "lock_days", "days_running", "total_roi_pct"] as const;
+  const update = Object.fromEntries(allowed.filter((key) => body[key] !== undefined).map((key) => [key, body[key]]));
+  if (!Object.keys(update).length || (update.name !== undefined && !String(update.name).trim()) || (update.exchange !== undefined && !String(update.exchange).trim()) ||
+      (update.min_stake !== undefined && !(Number(update.min_stake) > 0)) ||
+      (update.lock_days !== undefined && !(Number.isInteger(Number(update.lock_days)) && Number(update.lock_days) > 0)) ||
+      (update.days_running !== undefined && !(Number.isInteger(Number(update.days_running)) && Number(update.days_running) >= 0)) ||
+      (update.total_roi_pct !== undefined && !Number.isFinite(Number(update.total_roi_pct)))) return bad("Invalid strategy fields", 400);
 
   // Update strategy
-  const { error: updateError } = await db
+  const { data, error: updateError } = await db
     .from('ai_trading_strategies')
     .update({
-      ...body,
+      ...update,
       updated_at: new Date().toISOString(),
     })
-    .eq('strategy_id', strategyId);
+    .eq('strategy_id', strategyId)
+    .select('strategy_id');
 
   if (updateError) return bad(updateError.message, 400);
-
-  // If cycle_total_roi_pct changed, regenerate schedule
-  if (body.cycle_total_roi_pct !== undefined) {
-    const { data: strategy } = await db
-      .from('ai_trading_strategies')
-      .select('total_roi_pct, days_running')
-      .eq('strategy_id', strategyId)
-      .single();
-
-    if (strategy) {
-      await db.rpc('generate_30day_roi_schedule', {
-        p_strategy_id: strategyId,
-        p_total_roi_pct: body.cycle_total_roi_pct,
-        p_days_running: strategy.days_running,
-      });
-    }
-  }
+  if (!data?.length) return bad("Strategy not found or database rejected the update", 404);
 
   return Response.json({ success: true });
 }

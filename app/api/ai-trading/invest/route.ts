@@ -7,13 +7,15 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => null);
   const strategyId = String(body?.strategyId || "").trim();
-  const amount = parseFloat(body?.amount) || 0;
+  const amount = Number(body?.amount);
 
   if (!strategyId) return bad("strategyId required");
-  if (amount <= 0) return bad("Invalid amount");
+  if (!Number.isFinite(amount) || amount <= 0 || Math.round(amount * 100) !== amount * 100) return bad("Invalid amount");
 
   // Call DB function to create investment
-  const result = await supabase("rpc/create_ai_trading_investment", {
+  let result;
+  try {
+    result = await supabase("rpc/create_ai_trading_investment", {
     method: "POST",
     headers: { Prefer: "return=representation" },
     body: JSON.stringify({
@@ -21,9 +23,11 @@ export async function POST(req: NextRequest) {
       p_strategy_id: strategyId,
       p_amount: amount,
     }),
-  }).catch((err: Error) => {
-    return bad(err.message || "Investment failed");
-  });
+    });
+  } catch (err) {
+    return bad(err instanceof Error ? err.message : "Investment failed", 400);
+  }
 
-  return Response.json({ success: true, investmentId: result });
+  const investmentId = typeof result === "string" ? result : Array.isArray(result) ? result[0] : result;
+  return Response.json({ success: true, investmentId });
 }

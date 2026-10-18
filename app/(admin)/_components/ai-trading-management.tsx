@@ -18,6 +18,10 @@ type Strategy = {
   lockDays: number;     // default lock for NEW investors
   daysRunning: number;
   totalRoi: number;     // % since inception (moves with every posted daily ROI, can go down)
+  investors?: number;
+  totalStaked?: number;
+  todayRoi?: number | null;
+  todayTime?: string | null;
 };
 
 /** One admin-entered ROI for one strategy on one date. Can be negative (loss). */
@@ -124,14 +128,14 @@ function AdminStrategyCard({
             <Percent className="size-3" /> Today&apos;s daily ROI
           </p>
           {isSet ? (
-            <Badge label="Scheduled" tone="success" />
+            <Badge label={todayRoiTime ? "Scheduled" : "0% default"} tone="success" />
           ) : (
             <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">Not set</span>
           )}
         </div>
         <div className="mt-2 flex items-end justify-between gap-2">
           <p className={`text-2xl font-semibold tracking-tight ${isSet ? tone(todayRoi as number) : "text-muted-foreground"}`}>
-            {isSet ? pctText(todayRoi as number) : "—"}
+            {isSet ? pctText(todayRoi as number) : "0%"}
           </p>
           <p className="flex items-center gap-1 pb-1 text-xs text-muted-foreground">
             <Clock className="size-3" /> {todayRoiTime ?? "No time set"}
@@ -214,53 +218,29 @@ export function AiTradingManagement() {
   const [action, setAction] = useState<{ type: "unlock" | "extend"; inv: Investment } | null>(null);
   const [extendDays, setExtendDays] = useState("7");
 
+  async function refreshAdminData() {
+    const [sr, ir] = await Promise.all([fetch("/api/admin/ai-trading/strategies"), fetch("/api/admin/ai-trading/investments")]);
+    const [sd, id] = await Promise.all([sr.json(), ir.json()]);
+    if (!sr.ok) throw new Error(sd.message || "Strategies failed");
+    if (!ir.ok) throw new Error(id.message || "Investors failed");
+    const mappedStrategies: Strategy[] = (sd.strategies || []).map((s: any) => ({ id:s.strategy_id,name:s.name,exchange:s.exchange,minStake:Number(s.min_stake),lockDays:Number(s.lock_days),daysRunning:Number(s.days_running),totalRoi:Number(s.total_roi_pct),investors:Number(s.investor_count||0),totalStaked:Number(s.total_staked||0),todayRoi:s.today_roi_pct === null ? null : Number(s.today_roi_pct),todayTime:s.today_credit_at ? new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Dhaka",hour:"2-digit",minute:"2-digit"}).format(new Date(s.today_credit_at)) : null }));
+    const mappedInvestments: Investment[] = (id.investments || []).filter((x: any) => ["running","unlocked"].includes(x.status)).map((x: any) => ({ id:x.id,strategyId:x.strategy_id,name:`${x.user.first_name} ${x.user.last_name}`,email:x.user.email,invested:Number(x.amount),profit:Number(x.total_profit),startedAt:x.invested_at,lockDays:Number(x.lock_days),forceUnlocked:x.status === "unlocked" }));
+    setStrategies(mappedStrategies);
+    setInvestments(mappedInvestments);
+    setSelectedId((current) => current || mappedStrategies[0]?.id || "");
+  }
+
   // Fetch strategies and investments
   useEffect(() => {
     setLoading(true);
-    Promise.all([
-      fetch("/api/admin/ai-trading/strategies").then(r => {
-        console.log("Strategies API status:", r.status);
-        return r.json();
-      }),
-      fetch("/api/admin/ai-trading/investments").then(r => {
-        console.log("Investments API status:", r.status);
-        return r.json();
-      }),
-    ])
-      .then(([strategiesData, investmentsData]) => {
-        console.log("Strategies data:", strategiesData);
-        console.log("Investments data:", investmentsData);
-        
-        const fetchedStrategies: Strategy[] = (strategiesData.strategies || []).map((s: any) => ({
-          id: s.strategy_id,
-          name: s.name,
-          exchange: s.exchange,
-          minStake: parseFloat(s.min_stake),
-          lockDays: s.lock_days,
-          daysRunning: s.days_running,
-          totalRoi: parseFloat(s.total_roi_pct),
-        }));
-        setStrategies(fetchedStrategies);
-        if (fetchedStrategies.length > 0) setSelectedId(fetchedStrategies[0].id);
+    refreshAdminData().catch(console.error).finally(() => setLoading(false));
+  }, []);
 
-        const fetchedInvestments: Investment[] = (investmentsData.investments || []).map((inv: any) => ({
-          id: inv.id,
-          strategyId: inv.strategy_id,
-          name: `${inv.user.first_name} ${inv.user.last_name}`,
-          email: inv.user.email,
-          invested: parseFloat(inv.amount),
-          profit: parseFloat(inv.total_profit),
-          startedAt: inv.invested_at,
-          lockDays: inv.lock_days,
-          forceUnlocked: inv.status === "unlocked",
-        }));
-        setInvestments(fetchedInvestments);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Fetch error:", err);
-        setLoading(false);
-      });
+  useEffect(() => {
+    const timer = setInterval(() => { if (!document.hidden) refreshAdminData().catch(console.error); }, 15000);
+    const onFocus = () => { if (!document.hidden) refreshAdminData().catch(console.error); };
+    window.addEventListener("focus", onFocus);
+    return () => { clearInterval(timer); window.removeEventListener("focus", onFocus); };
   }, []);
 
   const selected = strategies.find((s) => s.id === selectedId);
@@ -289,12 +269,10 @@ export function AiTradingManagement() {
     if (!form) return;
     const minStake = parseFloat(form.minStake);
     const lockDays = parseInt(form.lockDays, 10);
-    const cycleTotalRoi = parseFloat(form.cycleTotalRoi);
 
-    if (!form.name.trim()) return setFormError("Package name is required");
+      if (!form.name.trim()) return setFormError("Package name is required");
     if (!(minStake > 0)) return setFormError("Minimum stake must be greater than 0");
-    if (!(lockDays >= 0)) return setFormError("Lock period must be 0 or more days");
-    if (Number.isNaN(cycleTotalRoi)) return setFormError("30-day cycle ROI is required");
+    if (!(lockDays > 0)) return setFormError("Lock period must be greater than 0 days");
 
     try {
       if (form.id) {
@@ -307,29 +285,16 @@ export function AiTradingManagement() {
             exchange: form.exchange.trim() || "Binance",
             min_stake: minStake,
             lock_days: lockDays,
+            days_running: Number(form.daysRunning),
+            total_roi_pct: Number(form.totalRoi),
           }),
         });
 
-        if (!res.ok) throw new Error("Update failed");
-
-        // Trigger schedule regeneration with new cycle ROI
-        await fetch(`/api/admin/ai-trading/strategies/${form.id}/regenerate-schedule`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cycle_total_roi_pct: cycleTotalRoi }),
-        });
-
-        setStrategies((prev) =>
-          prev.map((s) =>
-            s.id === form.id
-              ? { ...s, name: form.name.trim(), exchange: form.exchange.trim(), minStake, lockDays }
-              : s
-          )
-        );
+        if (!res.ok) throw new Error((await res.json()).message || "Update failed");
       } else {
         // Create
         const strategyId = form.name.trim().toLowerCase().replace(/\s+/g, "_");
-        await fetch("/api/admin/ai-trading/strategies", {
+        const res = await fetch("/api/admin/ai-trading/strategies", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -340,27 +305,18 @@ export function AiTradingManagement() {
             lock_days: lockDays,
           }),
         });
+        if (!res.ok) throw new Error((await res.json()).message || "Create failed");
 
-        // Refresh strategies
-        const data = await fetch("/api/admin/ai-trading/strategies").then(r => r.json());
-        const newStrats: Strategy[] = data.strategies.map((s: any) => ({
-          id: s.strategy_id,
-          name: s.name,
-          exchange: s.exchange,
-          minStake: parseFloat(s.min_stake),
-          lockDays: s.lock_days,
-          daysRunning: s.days_running,
-          totalRoi: parseFloat(s.total_roi_pct),
-        }));
-        setStrategies(newStrats);
-        if (newStrats.length > 0 && !selectedId) setSelectedId(newStrats[0].id);
       }
+
+      // Reflect persisted values, not optimistic form state.
+      await refreshAdminData();
 
       setFormError(null);
       setForm(null);
     } catch (err) {
       console.error(err);
-      setFormError("Save failed");
+      setFormError(err instanceof Error ? err.message : "Save failed");
     }
   }
 
@@ -372,25 +328,25 @@ export function AiTradingManagement() {
 
   async function handleSaveManualRoi() {
     if (!manualRoi) return;
-    const roi = parseFloat(manualRoi.roi);
-    if (Number.isNaN(roi)) return setManualError("Enter ROI %");
+    const roi = Number(manualRoi.roi);
+    if (manualRoi.roi.trim() === "" || !Number.isFinite(roi)) return setManualError("Enter ROI %");
     if (roi < -100) return setManualError("ROI can't be below -100%");
 
     try {
-      await fetch(`/api/admin/ai-trading/strategies/${manualRoi.strategyId}/daily-roi`, {
+      const res = await fetch(`/api/admin/ai-trading/strategies/${manualRoi.strategyId}/daily-roi`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ entries: [{ date: manualRoi.date, roi }] }),
+        body: JSON.stringify({ entries: [{ date: manualRoi.date, time: manualRoi.time, roi }] }),
       });
+      if (!res.ok) throw new Error((await res.json()).message || "Save failed");
 
       setManualError(null);
       setManualRoi(null);
       
-      // Refresh page
-      window.location.reload();
+      await refreshAdminData();
     } catch (err) {
       console.error(err);
-      setManualError("Save failed");
+      setManualError(err instanceof Error ? err.message : "Save failed");
     }
   }
 
@@ -406,7 +362,7 @@ export function AiTradingManagement() {
           id: String(e.id ?? `${e.date}-${i}`),
           strategyId,
           date: String(e.date).slice(0, 10),
-          time: e.time ?? undefined,
+          time: e.credit_at ? new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Dhaka", hour: "2-digit", minute: "2-digit" }).format(new Date(e.credit_at)) : undefined,
           roi: parseFloat(e.roi ?? e.roi_pct),
           credited: parseFloat(e.credited ?? e.total_credited ?? 0) || 0,
         }))
@@ -424,16 +380,18 @@ export function AiTradingManagement() {
   async function confirmUnlock() {
     if (!action) return;
     try {
-      await fetch(`/api/admin/ai-trading/investments/${action.inv.id}/unlock`, {
+      const res = await fetch(`/api/admin/ai-trading/investments/${action.inv.id}/unlock`, {
         method: "POST",
       });
+      if (!res.ok) throw new Error((await res.json()).message || "Unlock failed");
       setInvestments((prev) =>
         prev.map((i) => (i.id === action.inv.id ? { ...i, forceUnlocked: true } : i))
       );
+      await refreshAdminData();
       setAction(null);
     } catch (err) {
       console.error(err);
-      alert("Unlock failed");
+      alert(err instanceof Error ? err.message : "Unlock failed");
     }
   }
 
@@ -447,7 +405,8 @@ export function AiTradingManagement() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ days }),
     })
-      .then(() => {
+      .then(async (res) => {
+        if (!res.ok) throw new Error((await res.json()).message || "Extend failed");
         setInvestments((prev) =>
           prev.map((i) =>
             i.id === action.inv.id
@@ -455,11 +414,12 @@ export function AiTradingManagement() {
               : i
           )
         );
+        await refreshAdminData();
         setAction(null);
       })
       .catch((err) => {
         console.error(err);
-        alert("Extend failed");
+        alert(err instanceof Error ? err.message : "Extend failed");
       });
   }
 
@@ -567,8 +527,10 @@ export function AiTradingManagement() {
                 <AdminStrategyCard
                   key={s.id}
                   strategy={s}
-                  investorCount={inv.length}
-                  totalStaked={inv.reduce((a, i) => a + i.invested, 0)}
+                  investorCount={s.investors ?? inv.length}
+                  totalStaked={s.totalStaked ?? inv.reduce((a, i) => a + i.invested, 0)}
+                  todayRoi={s.todayRoi ?? null}
+                  todayRoiTime={s.todayTime ?? null}
                   onPostRoi={() => openManualRoi(s.id)}
                   onRoiList={() => openRoiList(s.id)}
                   onEdit={() => { setFormError(null); setForm(toForm(s)); }}
@@ -688,8 +650,8 @@ export function AiTradingManagement() {
       <Modal
         open={!!manualRoi}
         onClose={() => setManualRoi(null)}
-        title="Manual ROI override"
-        subtitle="Set the daily ROI and the time it is added to users"
+        title="Set daily ROI"
+        subtitle="Time uses UTC+06:00; future entries stay pending until scheduled"
         footer={
           <>
             <button type="button" onClick={() => setManualRoi(null)} className={`${btnGhost} flex-1`}>Cancel</button>
@@ -704,7 +666,7 @@ export function AiTradingManagement() {
                 <input
                   className={inputCls}
                   type="date"
-                  max={today}
+                  min={today}
                   value={manualRoi.date}
                   onChange={(e) => setManualRoi({ ...manualRoi, date: e.target.value })}
                 />

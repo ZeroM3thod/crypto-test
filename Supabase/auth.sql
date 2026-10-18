@@ -808,6 +808,23 @@ alter table public.ai_trades enable row level security;
 -- Alter existing tables to add new columns
 alter table public.ai_trading_strategies add column if not exists cycle_duration_days int not null default 30;
 alter table public.ai_trading_investments add column if not exists force_unlocked boolean not null default false;
+alter table public.ai_trading_daily_schedule add column if not exists credit_at timestamptz;
+
+create table if not exists public.ai_trading_roi_history (
+  id uuid primary key default gen_random_uuid(),
+  schedule_id uuid not null references public.ai_trading_daily_schedule(id) on delete cascade,
+  investment_id uuid not null references public.ai_trading_investments(id) on delete cascade,
+  user_id uuid not null references public.auth_users(id) on delete cascade,
+  strategy_id text not null,
+  date date not null,
+  roi_pct numeric(8,4) not null,
+  profit_amount numeric(18,2) not null,
+  balance_after numeric(18,2) not null,
+  credited_at timestamptz not null default now(),
+  unique(schedule_id, investment_id)
+);
+create index if not exists ai_trading_roi_history_user_idx on public.ai_trading_roi_history(user_id, credited_at desc);
+alter table public.ai_trading_roi_history enable row level security;
 
 -- Insert default strategies
 insert into public.ai_trading_strategies (strategy_id, name, exchange, min_stake, lock_days, total_roi_pct, days_running, cycle_duration_days) values
@@ -951,7 +968,9 @@ declare
 begin
   -- Get investment
   select * into v_investment from public.ai_trading_investments
-  where id = p_investment_id and user_id = p_user_id and status = 'unlocked';
+  where id = p_investment_id and user_id = p_user_id
+    and (status = 'unlocked' or force_unlocked = true or (status = 'running' and unlock_at <= now()))
+  for update;
 
   if not found then
     raise exception 'Investment not found or not unlocked';
@@ -959,7 +978,7 @@ begin
 
   -- Mark as withdrawn
   update public.ai_trading_investments
-  set status = 'withdrawn', withdrawn_at = now(), updated_at = now()
+  set status = 'withdrawn', force_unlocked = true, withdrawn_at = now(), updated_at = now()
   where id = p_investment_id;
 
   -- Return funds to trading wallet
@@ -968,9 +987,8 @@ begin
   where user_id = p_user_id and wallet = 'trading';
 
   -- Create transaction record
-  v_tx_hash := gen_random_uuid()::text;
   insert into public.wallet_transactions (user_id, wallet, type, amount, status, tx_hash)
-  values (p_user_id, 'trading', 'ai_trading_withdraw', v_investment.current_value, 'completed', v_tx_hash);
+  values (p_user_id, 'trading', 'ai_trading_withdraw', v_investment.current_value, 'completed', gen_random_uuid()::text);
 end;
 $$;
 
@@ -999,6 +1017,10 @@ security definer
 set search_path = public
 as $$
 begin
+  if not exists (select 1 from public.auth_users where id = p_admin_id and role in ('admin', 'owner')) then
+    raise exception 'Forbidden';
+  end if;
+
   update public.ai_trading_investments
   set force_unlocked = true, status = 'unlocked', updated_at = now()
   where id = p_investment_id;
@@ -1019,6 +1041,11 @@ security definer
 set search_path = public
 as $$
 begin
+  if not exists (select 1 from public.auth_users where id = p_admin_id and role in ('admin', 'owner')) then
+    raise exception 'Forbidden';
+  end if;
+  if p_additional_days <= 0 then raise exception 'Invalid extension days'; end if;
+
   update public.ai_trading_investments
   set 
     lock_days = lock_days + p_additional_days,
@@ -1103,41 +1130,42 @@ declare
   v_profit_delta numeric;
   v_tx_hash text;
   v_total_credited numeric;
+  v_balance_after numeric;
 begin
   -- Process all uncredited schedules for today
   for v_schedule in
     select * from public.ai_trading_daily_schedule
-    where date = current_date and credited = false
+    where date <= (now() at time zone 'Asia/Dhaka')::date
+      and coalesce(credit_at, ((date + time '23:59:00') at time zone 'Asia/Dhaka')) <= now()
+      and credited = false
+    for update skip locked
   loop
+    if v_schedule.credited then continue; end if;
     v_total_credited := 0;
     
     -- Apply ROI to all running investments in this strategy
     for v_investment in
       select * from public.ai_trading_investments
       where strategy_id = v_schedule.strategy_id 
-        and status = 'running'
+        and status in ('running', 'unlocked')
         and invested_at::date <= v_schedule.date
     loop
       -- Calculate profit/loss for this investment
-      v_profit_delta := (v_investment.current_value * v_schedule.roi_pct) / 100;
+      v_profit_delta := round((v_investment.current_value * v_schedule.roi_pct) / 100, 2);
       
       -- Update investment
+      v_balance_after := greatest(0, round(v_investment.current_value + v_profit_delta, 2));
+      v_profit_delta := v_balance_after - v_investment.current_value;
       update public.ai_trading_investments
       set
-        current_value = current_value + v_profit_delta,
+        current_value = v_balance_after,
         total_profit = total_profit + v_profit_delta,
         updated_at = now()
       where id = v_investment.id;
-      
-      -- Add to trading wallet
-      update public.wallet_accounts
-      set balance = balance + v_profit_delta, updated_at = now()
-      where user_id = v_investment.user_id and wallet = 'trading';
-      
-      -- Record transaction
-      v_tx_hash := gen_random_uuid()::text;
-      insert into public.wallet_transactions (user_id, wallet, type, amount, status, tx_hash)
-      values (v_investment.user_id, 'trading', 'ai_trading_profit', v_profit_delta, 'completed', v_tx_hash);
+
+      insert into public.ai_trading_roi_history (schedule_id, investment_id, user_id, strategy_id, date, roi_pct, profit_amount, balance_after)
+      values (v_schedule.id, v_investment.id, v_investment.user_id, v_investment.strategy_id, v_schedule.date, v_schedule.roi_pct, v_balance_after - v_investment.current_value, v_balance_after)
+      on conflict (schedule_id, investment_id) do nothing;
       
       -- Record trade
       insert into public.ai_trades (
@@ -1199,12 +1227,36 @@ security definer
 set search_path = public
 as $$
 begin
-  insert into public.ai_trading_daily_schedule (strategy_id, date, roi_pct, is_manual)
-  values (p_strategy_id, p_date, p_roi_pct, true)
+  if p_date < (now() at time zone 'Asia/Dhaka')::date or p_roi_pct < -100 then raise exception 'Invalid ROI date or percentage'; end if;
+  if not exists (select 1 from public.auth_users where id = p_admin_id and role in ('admin', 'owner')) then raise exception 'Forbidden'; end if;
+  insert into public.ai_trading_daily_schedule (strategy_id, date, roi_pct, is_manual, credit_at)
+  values (p_strategy_id, p_date, p_roi_pct, true, (p_date + time '23:59:00') at time zone 'Asia/Dhaka')
   on conflict (strategy_id, date) 
-  do update set roi_pct = p_roi_pct, is_manual = true, updated_at = now();
+  do update set roi_pct = p_roi_pct, is_manual = true, credited = false, credit_at = excluded.credit_at, updated_at = now();
   
   perform public.log_admin_action(p_admin_id, null, 'set_manual_daily_roi', jsonb_build_object('strategy_id', p_strategy_id, 'date', p_date, 'roi_pct', p_roi_pct));
+end;
+$$;
+
+create or replace function public.set_manual_daily_roi_at(
+  p_strategy_id text,
+  p_date date,
+  p_roi_pct numeric,
+  p_credit_at timestamptz,
+  p_admin_id uuid
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (select 1 from public.auth_users where id = p_admin_id and role in ('admin','owner')) then raise exception 'Forbidden'; end if;
+  if p_date < (now() at time zone 'Asia/Dhaka')::date or p_roi_pct < -100 or p_credit_at < now() then raise exception 'Invalid ROI date, time, or percentage'; end if;
+  insert into public.ai_trading_daily_schedule(strategy_id,date,roi_pct,is_manual,credited,credit_at)
+  values (p_strategy_id,p_date,p_roi_pct,true,false,p_credit_at)
+  on conflict(strategy_id,date) do update set roi_pct=excluded.roi_pct,is_manual=true,credited=false,credited_at=null,credit_at=excluded.credit_at,updated_at=now();
+  perform public.log_admin_action(p_admin_id,null,'set_manual_daily_roi',jsonb_build_object('strategy_id',p_strategy_id,'date',p_date,'roi_pct',p_roi_pct,'credit_at',p_credit_at));
 end;
 $$;
 
@@ -1738,15 +1790,13 @@ begin
   end if;
 end $$;
 
--- AI trading daily ROI distribution (23:59:59 UTC daily)
+-- AI trading ROI processing (scheduled dates and UTC+06:00 times)
 do $$
 begin
   if not exists (select 1 from cron.job where jobname = 'process-daily-ai-trading-roi') then
-    perform cron.schedule(
-      'process-daily-ai-trading-roi',
-      '59 23 * * *',
-      'select public.process_daily_ai_trading_roi();'
-    );
+    perform cron.schedule('process-daily-ai-trading-roi', '* * * * *', 'select public.process_daily_ai_trading_roi();');
+  else
+    perform cron.alter_job((select jobid from cron.job where jobname = 'process-daily-ai-trading-roi'), schedule := '* * * * *');
   end if;
 end $$;
 

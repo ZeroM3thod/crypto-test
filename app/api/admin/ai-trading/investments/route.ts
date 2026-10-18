@@ -12,9 +12,10 @@ export async function GET(req: NextRequest) {
   const visibleIds = await visibleUserIdsFor(session.user.role);
   if (!visibleIds.length) return Response.json({ investments: [] });
 
-  const investments = await supabase<any[]>(
+  let investments;
+  try { investments = await supabase<any[]>(
     `ai_trading_investments?select=*,user:auth_users(first_name,last_name,email)&user_id=in.${inFilter(visibleIds.map(q))}&order=created_at.desc`
-  );
+  ); } catch (err) { return bad(err instanceof Error ? err.message : "Could not load investments", 500); }
 
   return Response.json({ investments });
 }

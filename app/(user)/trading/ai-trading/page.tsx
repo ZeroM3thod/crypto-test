@@ -108,12 +108,14 @@ type Strategy = {
   exchange: string;
   minStake: number;
   roiPct: number;
+  todayRoiPct?: number;
   daysRunning: number;
   lockDays: number;
   daysElapsed: number;
   status: StrategyStatus;
   invested?: number;
   currentProfit?: number;
+  investmentId?: string;
 };
 
 // ── Invest dialog ────────────────────────────────────────────────────────
@@ -425,17 +427,16 @@ function StrategyCard({
       const res = await fetch("/api/ai-trading/withdraw", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ investmentId: strategy.id }),
+          body: JSON.stringify({ investmentId: strategy.investmentId }),
       });
 
       if (res.ok) {
         setState("success");
-        // Refresh page after 1s
         setTimeout(() => window.location.reload(), 1000);
       } else {
         setState("idle");
         const err = await res.json();
-        alert(err.error || "Withdrawal failed");
+        alert(err.message || err.error || "Withdrawal failed");
       }
     } catch (err) {
       console.error(err);
@@ -626,79 +627,34 @@ export default function AiTradingPage() {
   const [balance, setBalance] = useState(0);
   const [investing, setInvesting] = useState<Strategy | null>(null);
   const [trades, setTrades] = useState<AiTrade[]>([]);
+  const [roiHistory, setRoiHistory] = useState<any[]>([]);
 
-  // Fetch available strategies
-  useEffect(() => {
-    fetch("/api/ai-trading/strategies")
-      .then((r) => r.json())
-      .then((data) => {
-        const strats: Strategy[] = data.strategies.map((s: any) => ({
-          id: s.strategy_id,
-          name: s.name,
-          exchange: s.exchange,
-          minStake: parseFloat(s.min_stake),
-          roiPct: parseFloat(s.total_roi_pct),
-          daysRunning: s.days_running,
-          lockDays: s.lock_days,
-          daysElapsed: 0,
-          status: "not-invested" as StrategyStatus,
-        }));
-        setStrategies(strats);
-      })
-      .catch(console.error);
-  }, []);
+  async function refreshAiTrading() {
+    const [sr, ar] = await Promise.all([fetch("/api/ai-trading/strategies"), fetch("/api/ai-trading/stats")]);
+    const [sd, data] = await Promise.all([sr.json(), ar.json()]);
+    if (!sr.ok || !ar.ok) throw new Error(sd.message || data.message || "AI Trading refresh failed");
+    const mapped: Strategy[] = sd.strategies.map((s: any) => {
+      const inv = data.investments.find((x: any) => x.strategy_id === s.strategy_id);
+      const elapsed = inv ? Math.max(0, Math.floor((Date.now() - new Date(inv.invested_at).getTime()) / 86400000)) : 0;
+      const daysLeft = inv ? Math.max(0, Math.ceil((new Date(inv.unlock_at).getTime() - Date.now()) / 86400000)) : 0;
+      return { id:s.strategy_id,name:s.name,exchange:s.exchange,minStake:Number(s.min_stake),roiPct:Number(s.total_roi_pct),todayRoiPct:Number(s.today_roi_pct||0),daysRunning:Number(s.days_running),lockDays:Number(inv?.lock_days ?? s.lock_days),daysElapsed:elapsed,status:!inv?"not-invested":inv.status === "unlocked" || daysLeft === 0?"unlocked":"running",invested:inv?Number(inv.amount):undefined,currentProfit:inv?Number(inv.total_profit):undefined,investmentId:inv?.id };
+    });
+    setStrategies(mapped);
+    setBalance(Number(data.balance) || 0);
+    setTrades(data.trades.map((t: any) => ({ id:t.id,date:t.executed_at.split("T")[0],strategy:t.strategy_name,size:Number(t.trade_size),duration:`${Math.floor(t.duration_minutes/60)}h ${t.duration_minutes%60}m`,pnl:Number(t.pnl) })));
+    setRoiHistory(data.roiHistory || []);
+  }
 
-  // Fetch stats and investments
   useEffect(() => {
     setLoading(true);
-    fetch("/api/ai-trading/stats")
-      .then((r) => r.json())
-      .then((data) => {
-        setBalance(parseFloat(data.balance) || 0);
+    refreshAiTrading().catch(console.error).finally(() => setLoading(false));
+  }, []);
 
-        // Merge strategies with user investments
-        setStrategies((prevStrats) => {
-          const investmentMap = new Map<string, any>(
-            data.investments.map((inv: any): [string, any] => [inv.strategy_id, inv])
-          );
-
-          return prevStrats.map((s) => {
-            const inv = investmentMap.get(s.id);
-            if (!inv) return s;
-
-            const elapsed = Math.floor(
-              (Date.now() - new Date(inv.invested_at).getTime()) / 86400000
-            );
-            const daysLeft = Math.max(0, inv.lock_days - elapsed);
-            const status: StrategyStatus =
-              inv.status === "unlocked" ? "unlocked" : daysLeft === 0 ? "unlocked" : "running";
-
-            return {
-              ...s,
-              status,
-              daysElapsed: elapsed,
-              invested: parseFloat(inv.amount),
-              currentProfit: parseFloat(inv.total_profit),
-            };
-          });
-        });
-
-        // Map trades
-        const aiTrades: AiTrade[] = data.trades.map((t: any) => ({
-          id: t.id,
-          date: t.executed_at.split("T")[0],
-          strategy: t.strategy_name,
-          size: parseFloat(t.trade_size),
-          duration: `${Math.floor(t.duration_minutes / 60)}h ${t.duration_minutes % 60}m`,
-          pnl: parseFloat(t.pnl),
-        }));
-        setTrades(aiTrades);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setLoading(false);
-      });
+  useEffect(() => {
+    const timer = setInterval(() => { if (!document.hidden) refreshAiTrading().catch(console.error); }, 15000);
+    const onFocus = () => { if (!document.hidden) refreshAiTrading().catch(console.error); };
+    window.addEventListener("focus", onFocus);
+    return () => { clearInterval(timer); window.removeEventListener("focus", onFocus); };
   }, []);
 
   const totalInvested = strategies.reduce((sum, s) => sum + (s.invested ?? 0), 0);
@@ -721,32 +677,17 @@ export default function AiTradingPage() {
 
       if (!res.ok) {
         const err = await res.json();
-        alert(err.error || "Investment failed");
+        alert(err.message || err.error || "Investment failed");
         setInvesting(null);
         return;
       }
 
       // Refresh stats
-      const data = await fetch("/api/ai-trading/stats").then((r) => r.json());
-      setBalance(parseFloat(data.balance) || 0);
-
-      setStrategies((prev) =>
-        prev.map((s) => {
-          if (s.id !== strategy.id) return s;
-          return {
-            ...s,
-            status: "running" as StrategyStatus,
-            invested: amount,
-            currentProfit: 0,
-            daysElapsed: 0,
-          };
-        })
-      );
-
+      await refreshAiTrading();
       setInvesting(null);
     } catch (err) {
       console.error(err);
-      alert("Investment failed");
+      alert(err instanceof Error ? err.message : "Investment failed");
       setInvesting(null);
     }
   }
@@ -801,7 +742,7 @@ export default function AiTradingPage() {
 
         {/* ── AI activity / trade history ───────────────── */}
         <section aria-label="AI Trade History">
-          <SectionHeader title="AI Trade History" actionLabel="View all" action={() => {}} />
+          <SectionHeader title="AI Trade History" />
 
           {/* History summary */}
           <div className="mb-3 grid grid-cols-3 gap-3">
@@ -828,6 +769,15 @@ export default function AiTradingPage() {
             height={400}
             rowHeight={44}
           />
+          <SectionHeader title="Daily ROI History" />
+          <div className="space-y-2">
+            {roiHistory.length === 0 ? <p className="text-xs text-muted-foreground">No credited ROI yet.</p> : roiHistory.map((entry) => (
+              <div key={entry.id} className="flex justify-between rounded-xl border border-border px-3 py-2 text-xs">
+                <span className="text-muted-foreground">{entry.date} · {entry.strategy_id}</span>
+                <span className={Number(entry.profit_amount) < 0 ? "text-destructive" : "text-success"}>{Number(entry.roi_pct) > 0 ? "+" : ""}{entry.roi_pct}% · ${fmt(Number(entry.profit_amount))}</span>
+              </div>
+            ))}
+          </div>
         </section>
 
         <div className="h-20" />
