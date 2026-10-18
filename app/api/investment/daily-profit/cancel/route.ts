@@ -11,16 +11,14 @@ export async function POST(req: NextRequest) {
   if (!investmentId) return bad("investmentId required");
 
   // Call DB function to cancel investment
-  await supabase("rpc/cancel_daily_profit_investment", {
+  try { await supabase("rpc/cancel_daily_profit_investment", {
     method: "POST",
     headers: { Prefer: "return=minimal" },
     body: JSON.stringify({
       p_user_id: session.user.id,
       p_investment_id: investmentId,
     }),
-  }).catch((err: Error) => {
-    return bad(err.message || "Cancel failed");
-  });
+  }); } catch (err) { return bad(err instanceof Error ? err.message : "Cancel failed"); }
 
   return Response.json({ success: true });
 }

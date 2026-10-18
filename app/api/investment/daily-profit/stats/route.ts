@@ -5,6 +5,8 @@ export async function GET(req: NextRequest) {
   const session = await getSession(req);
   if (!session) return bad("Unauthorized", 401);
 
+  await supabase("rpc/process_daily_profit_credits", { method: "POST" });
+
   // Get active investments
   const investments = await supabase<any[]>(
     `daily_profit_investments?select=*&user_id=eq.${q(session.user.id)}&status=eq.active`

@@ -12,8 +12,12 @@ export async function POST(req: NextRequest) {
   if (!planId) return bad("planId required");
   if (amount <= 0) return bad("Invalid amount");
 
+  const wallets = await supabase<{ balance: number | string }[]>(`wallet_accounts?select=balance&user_id=eq.${q(session.user.id)}&wallet=eq.investment&limit=1`);
+  if (Number(wallets[0]?.balance ?? 0) < amount) return bad("Not enough dollars in your Investment Wallet to invest in this package.");
+
   // Call DB function to create investment
-  const result = await supabase("rpc/create_daily_profit_investment", {
+  let result;
+  try { result = await supabase("rpc/create_daily_profit_investment", {
     method: "POST",
     headers: { Prefer: "return=representation" },
     body: JSON.stringify({
@@ -21,9 +25,10 @@ export async function POST(req: NextRequest) {
       p_plan_id: planId,
       p_amount: amount,
     }),
-  }).catch((err: Error) => {
-    return bad(err.message || "Investment failed");
-  });
+  }); } catch (err) {
+    const message = err instanceof Error ? err.message : "Investment failed";
+    return bad(message.toLowerCase().includes("insufficient") ? "Not enough dollars in your Investment Wallet to invest in this package." : message);
+  }
 
   return Response.json({ success: true, investmentId: result });
 }

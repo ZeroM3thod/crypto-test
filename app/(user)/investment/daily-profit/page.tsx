@@ -815,48 +815,22 @@ export default function DailyProfitPage() {
       .catch(console.error);
   }, []);
 
-  // Fetch stats and investments
   useEffect(() => {
-    setLoading(true);
-    fetch("/api/investment/daily-profit/stats")
-      .then((r) => r.json())
-      .then((data) => {
-        // Map investments to ActivePlan
-        const active: ActivePlan[] = data.investments.map((inv: any) => ({
-          id: inv.id,
-          planId: inv.plan_id,
-          planName: inv.plan_name,
-          rate: parseFloat(inv.daily_rate),
-          invested: parseFloat(inv.amount),
-          startedAt: new Date(inv.started_at),
-          creditsEarned: inv.credits_earned,
-          profitPerCycle: parseFloat(inv.profit_per_cycle),
-          nextCreditAt: new Date(inv.next_credit_at),
-          profitIntervalSec: inv.profit_interval_seconds ?? 86400,
-          lockPeriodSec: inv.cancel_policy_seconds ?? inv.cancel_policy_hours * 3600,
-        }));
-        setActivePlans(active);
-
-        // Map history
-        const history: HistoryRow[] = data.history.map((h: any) => ({
-          id: h.id,
-          date: h.credited_at.split("T")[0],
-          planName: h.plan_name,
-          planId: h.plan_id,
-          invested: parseFloat(h.invested_amount),
-          rate: parseFloat(h.daily_rate),
-          profit: parseFloat(h.profit_amount),
-          walletCredited: "Investment Wallet",
-          cumulative: parseFloat(h.cumulative_profit),
-          status: h.status,
-        }));
-        setHistoryRows(history);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setLoading(false);
-      });
+    const refresh = () => fetch("/api/investment/daily-profit/stats", { cache: "no-store" }).then((r) => r.json()).then((data) => {
+      setActivePlans(data.investments.map((inv: any) => ({
+        id: inv.id, planId: inv.plan_id, planName: inv.plan_name, rate: Number(inv.daily_rate), invested: Number(inv.amount),
+        startedAt: new Date(inv.started_at), creditsEarned: inv.credits_earned, profitPerCycle: Number(inv.profit_per_cycle),
+        nextCreditAt: new Date(inv.next_credit_at), profitIntervalSec: inv.profit_interval_seconds ?? 86400,
+        lockPeriodSec: inv.cancel_policy_seconds ?? inv.cancel_policy_hours * 3600,
+      })));
+      setHistoryRows(data.history.map((h: any) => ({
+        id: h.id, date: h.credited_at.split("T")[0], planName: h.plan_name, planId: h.plan_id,
+        invested: Number(h.invested_amount), rate: Number(h.daily_rate), profit: Number(h.profit_amount),
+        walletCredited: "Investment Wallet", cumulative: Number(h.cumulative_profit), status: h.status,
+      })));
+    }).catch(console.error);
+    const id = setInterval(refresh, 10000);
+    return () => clearInterval(id);
   }, []);
 
   // Derived stats
@@ -880,7 +854,7 @@ export default function DailyProfitPage() {
       
       if (!res.ok) {
         const err = await res.json();
-        setToast(err.error || "Investment failed");
+        setToast(err.message || err.error || "Investment failed");
         setInvestTarget(null);
         return;
       }
