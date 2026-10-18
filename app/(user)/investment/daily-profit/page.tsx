@@ -126,23 +126,22 @@ function fmt(n: number, decimals = 2) {
   return "$" + n.toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
-function useCountdown(targetMs: number) {
-  const [remaining, setRemaining] = useState(Math.max(0, targetMs - Date.now()));
+function useCountdown(targetMs: number, repeatMs = 0) {
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    if (remaining <= 0) return;
-    const id = setInterval(() => {
-      const r = Math.max(0, targetMs - Date.now());
-      setRemaining(r);
-      if (r === 0) clearInterval(id);
-    }, 1000);
+    const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
-  }, [targetMs, remaining]);
+  }, [targetMs]);
+  const nextTarget = repeatMs > 0 && now >= targetMs
+    ? targetMs + (Math.floor((now - targetMs) / repeatMs) + 1) * repeatMs
+    : targetMs;
+  const remaining = Math.max(0, nextTarget - now);
   const h = Math.floor(remaining / 3600000);
   const m = Math.floor((remaining % 3600000) / 60000);
   const s = Math.floor((remaining % 60000) / 1000);
   return {
     display: `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`,
-    done: remaining === 0,
+    done: remaining === 0 && repeatMs === 0,
   };
 }
 
@@ -292,7 +291,7 @@ function ActivePlanCard({
   const nextCreditMs = plan.nextCreditAt.getTime();
 
   const cancelCountdown = useCountdown(cancelUnlockMs);
-  const creditCountdown = useCountdown(nextCreditMs);
+  const creditCountdown = useCountdown(nextCreditMs, plan.profitIntervalSec * 1000);
 
   const totalEarned = plan.profitPerCycle * plan.creditsEarned;
   const elapsed = Date.now() - plan.startedAt.getTime();
@@ -828,8 +827,10 @@ export default function DailyProfitPage() {
         invested: Number(h.invested_amount), rate: Number(h.daily_rate), profit: Number(h.profit_amount),
         walletCredited: "Investment Wallet", cumulative: Number(h.cumulative_profit), status: h.status,
       })));
+      setLoading(false);
     }).catch(console.error);
-    const id = setInterval(refresh, 10000);
+    refresh();
+    const id = setInterval(refresh, 1000);
     return () => clearInterval(id);
   }, []);
 
