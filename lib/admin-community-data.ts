@@ -10,6 +10,8 @@ export type ChatMessage = {
   admin?: boolean;
   pinned?: boolean;
   fake?: boolean; // sent by Admin on behalf of a persona
+  replyText?: string | null;
+  replyUsername?: string | null;
 };
 
 export type ChatUser = {

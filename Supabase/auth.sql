@@ -2080,6 +2080,14 @@ create table if not exists public.chat_reports (
   created_at timestamptz not null default now()
 );
 
+alter table public.chat_messages add column if not exists reply_to uuid references public.chat_messages(id) on delete set null;
+alter table public.chat_messages add column if not exists reply_username text;
+alter table public.chat_messages add column if not exists reply_message text;
+
+create unique index if not exists chat_bans_one_active_per_user_idx on public.chat_bans (user_id) where active = true;
+
+alter table public.chat_bans add column if not exists expires_at timestamptz;
+
 alter table public.chat_reports drop constraint if exists chat_reports_status_check;
 alter table public.chat_reports add constraint chat_reports_status_check check (status in ('pending', 'seen', 'reviewed', 'dismissed'));
 
@@ -2130,7 +2138,7 @@ declare
 begin
   select exists(
     select 1 from public.chat_bans
-    where user_id = p_user_id and active = true
+    where user_id = p_user_id and active = true and (expires_at is null or expires_at > now())
   ) into v_banned;
   return v_banned;
 end;
@@ -2148,8 +2156,9 @@ security definer
 set search_path = public
 as $$
 begin
-  insert into public.chat_bans (user_id, banned_by, reason)
-  values (p_user_id, p_admin_id, p_reason);
+  insert into public.chat_bans (user_id, banned_by, reason, expires_at)
+  values (p_user_id, p_admin_id, p_reason, null)
+  on conflict do nothing;
 end;
 $$;
 

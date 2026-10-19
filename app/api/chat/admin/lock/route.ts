@@ -12,10 +12,11 @@ export async function POST(req: NextRequest) {
   const session = await getSession(req);
   if (!session || (session.user.role !== "admin" && session.user.role !== "owner")) return bad("Unauthorized", 403);
   const { locked } = await req.json();
-  await supabase("chat_settings?key=eq.chat_locked", {
-    method: "PATCH",
-    headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({ value: !!locked }),
+  if (typeof locked !== "boolean") return bad("Locked must be boolean");
+  await supabase("chat_settings?on_conflict=key", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify({ key: "chat_locked", value: locked }),
   });
   return Response.json({ ok: true });
 }

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { bad, getSession, supabase } from "@/lib/auth/backend";
+import { bad, getSession, q, supabase } from "@/lib/auth/backend";
 
 export async function POST(req: NextRequest) {
   const session = await getSession(req);
@@ -8,14 +8,12 @@ export async function POST(req: NextRequest) {
   }
 
   const { userId } = await req.json();
-  if (!userId) return bad("User ID is required");
+  if (typeof userId !== "string") return bad("User ID is required");
 
-  await supabase(`rpc/unban_user_from_chat`, {
+  await supabase(`chat_bans?user_id=eq.${q(userId)}&active=eq.true`, {
     method: "POST",
-    body: JSON.stringify({
-      p_user_id: userId,
-      p_admin_id: session.user.id,
-    }),
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ active: false, unbanned_at: new Date().toISOString(), unbanned_by: session.user.id }),
   });
 
   return Response.json({ ok: true });

@@ -10,10 +10,11 @@ export async function POST(req: NextRequest) {
   const { messageId, pinned } = await req.json();
   if (!messageId) return bad("Message ID is required");
 
+  if (typeof pinned !== "boolean") return bad("Pinned must be boolean");
   await supabase(`chat_messages?id=eq.${q(messageId)}`, {
     method: "PATCH",
     headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({ pinned: !!pinned }),
+    body: JSON.stringify({ pinned }),
   });
 
   return Response.json({ ok: true });

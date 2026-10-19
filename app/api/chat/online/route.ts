@@ -16,7 +16,10 @@ export async function GET(req: NextRequest) {
     `chat_online_users?select=user_id,auth_users(first_name,last_name,user_id)&last_seen=gte.${new Date(Date.now() - 5 * 60 * 1000).toISOString()}`
   );
 
-  const onlineUsers = users.map(u => ({
+  const bans = await supabase<any[]>(`chat_bans?select=user_id&active=eq.true&or=(expires_at.is.null,expires_at.gt.${encodeURIComponent(new Date().toISOString())})`);
+  const bannedIds = new Set(bans.map((b) => b.user_id));
+  const visibleUsers = users.filter((u) => !bannedIds.has(u.user_id));
+  const onlineUsers = visibleUsers.map(u => ({
     id: u.user_id,
     username: `${u.auth_users?.first_name || "User"}_${u.auth_users?.last_name?.charAt(0) || "U"}`,
     avatarUrl: avatarForUser(u.user_id),

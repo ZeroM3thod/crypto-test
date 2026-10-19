@@ -8,12 +8,13 @@ export async function POST(req: NextRequest) {
   }
 
   const { userId, reason, expiresAt } = await req.json();
-  if (!userId || !reason?.trim()) return bad("User ID and reason are required");
+  if (typeof userId !== "string" || typeof reason !== "string" || !reason.trim()) return bad("User ID and reason are required");
   if (expiresAt != null && (!Number.isFinite(Date.parse(expiresAt)) || Date.parse(expiresAt) <= Date.now())) return bad("Ban expiry must be in the future");
+  if (session.user.id === userId) return bad("Cannot ban yourself");
   await supabase("chat_bans", {
     method: "POST",
     headers: { Prefer: "return=minimal,resolution=merge-duplicates" },
-    body: JSON.stringify({ user_id: userId, admin_id: session.user.id, reason: reason.trim(), active: true, banned_at: new Date().toISOString(), expires_at: expiresAt || null }),
+    body: JSON.stringify({ user_id: userId, banned_by: session.user.id, reason: reason.trim(), active: true, banned_at: new Date().toISOString(), expires_at: expiresAt }),
   });
 
   return Response.json({ ok: true });

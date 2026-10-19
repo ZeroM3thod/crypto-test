@@ -301,6 +301,7 @@ function MessageBubble({
           <span>{msg.timestamp}</span>
           {msg.pinned ? <Pin className="size-2.5 text-foreground" /> : null}
         </div>
+        {msg.replyText && <div className="mb-1 rounded border-l-2 border-primary bg-muted/60 px-2 py-1 text-left text-[11px]"><b>{msg.replyUsername || "Reply"}</b><p className="truncate">{msg.replyText}</p></div>}
         <div
           className={`inline-block rounded-lg px-3 py-2 text-left text-sm leading-relaxed ${
             admin
@@ -562,7 +563,7 @@ function ScriptDialog({
   saved: SavedScript[];
   onSave: (name: string, lines: ScriptLine[]) => void;
   onDelete: (id: string) => void;
-  onRun: (lines: ScriptLine[], mode: RunMode) => boolean;
+  onRun: (lines: ScriptLine[], mode: RunMode) => boolean | Promise<boolean>;
   ensurePersona: (username: string) => string;
   onNotice: (msg: string) => void;
 }) {
@@ -648,8 +649,8 @@ function ScriptDialog({
     setView("builder");
   };
 
-  const run = () => {
-    if (onRun(lines, runMode)) onClose();
+  const run = async () => {
+    if (await onRun(lines, runMode)) onClose();
   };
 
   const PASTE_EXAMPLE =
@@ -906,7 +907,7 @@ export function CommunityChatView({
     const response = await fetch("/api/chat/messages");
     if (!response.ok) throw new Error("Could not refresh messages");
     const rows = await response.json();
-    setMessages(rows.map((m: any) => ({ id: m.id, userId: m.user_id || "admin", username: m.username || `${m.first_name || "Admin"}_${m.last_name?.[0] || "U"}`, avatar: m.avatar || m.first_name?.[0] || "A", text: m.message, timestamp: new Date(m.created_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }), admin: m.is_admin, pinned: m.pinned })));
+    setMessages(rows.map((m: any) => ({ id: m.id, userId: m.user_id || "admin", username: m.username || `${m.first_name || "Admin"}_${m.last_name?.[0] || "U"}`, avatar: m.avatar || m.first_name?.[0] || "A", text: m.message, timestamp: new Date(m.created_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }), admin: m.is_admin, pinned: m.pinned, replyText: m.reply_to?.message || m.reply_message, replyUsername: m.reply_to?.username || m.reply_username })));
   };
   const refreshReports = async () => { const res = await fetch("/api/chat/admin/reports"); if (res.ok) setReports(await res.json()); };
   const reviewReport = async (reportId: string, action: "dismiss" | "ban" | "seen") => {
@@ -971,12 +972,15 @@ export function CommunityChatView({
     const refresh = async () => {
       try {
         await refreshMessages();
-        const [onlineRes, settingsRes] = await Promise.all([fetch("/api/chat/online"), fetch("/api/chat/admin/lock")]);
+        const [onlineRes, settingsRes, reportsRes, countRes, rulesRes] = await Promise.all([fetch("/api/chat/online"), fetch("/api/chat/admin/lock"), fetch("/api/chat/admin/reports"), fetch("/api/chat/admin/online-count"), fetch("/api/chat/rules")]);
+        if (rulesRes.ok) setRules((await rulesRes.json()).map((r: any) => r.rule_text));
+        if (reportsRes.ok) setReports(await reportsRes.json());
+        else if (reportsRes.status !== 401 && reportsRes.status !== 403) console.error("Report refresh failed", await reportsRes.text());
         if (onlineRes.ok) {
           const data = await onlineRes.json();
           setOnlineCount(data.count || 0);
-          setOnlineOverride(data.override == null ? null : Number(data.override));
         }
+        if (countRes.ok) { const data = await countRes.json(); setOnlineOverride(data.count == null ? null : Number(data.count)); }
         if (settingsRes.ok) setLocked((await settingsRes.json()).locked);
       } catch (e) { console.error("Community refresh failed", e); }
     };
@@ -1075,8 +1079,8 @@ export function CommunityChatView({
   /* ---------- posting (local state only — no DB) ---------- */
 
   const pushMessage = useCallback(async (p: ChatUser, text: string, _ts?: string) => {
-    try { await api("/api/chat/messages", { message: text, ...(p.id !== "admin" ? { persona: { username: p.username, avatar: p.avatar } } : {}) }); await refreshMessages(); }
-    catch (e) { showToast(String(e)); }
+    await api("/api/chat/messages", { message: text, ...(p.id !== "admin" ? { persona: { username: p.username, avatar: p.avatar } } : {}) });
+    await refreshMessages();
   }, [showToast]);
 
   const handleSend = useCallback(async () => {
@@ -1092,7 +1096,7 @@ export function CommunityChatView({
       const response = await fetch("/api/chat/admin/export");
       if (!response.ok) throw new Error("Could not export chat data");
       const data = await response.json();
-      showToast(`✓ Backed up ${data.transferred} messages to db/chat-archive.json; removed from Supabase.`);
+      showToast(`✓ Backed up ${data.transferred} messages. Database rows retained.`);
     } catch (e) { showToast(String(e)); }
     finally { setTransferring(false); }
   };
@@ -1162,8 +1166,9 @@ export function CommunityChatView({
     setPlaying(false);
   }, []);
 
-  const runScript = (lines: ScriptLine[], mode: "now" | "live"): boolean => {
+  const runScript = async (lines: ScriptLine[], mode: "now" | "live"): Promise<boolean> => {
     const valid = lines.filter((l) => l.text.trim());
+    if (valid.some((l) => !Number.isFinite(l.delay) || l.delay < 0 || l.delay > 3600 || l.text.length > 2000)) { showToast("Script has invalid delay or message length."); return false; }
     const resolved = valid
       .map((l) => ({ line: l, persona: lookup(l.personaId) }))
       .filter(
@@ -1180,10 +1185,10 @@ export function CommunityChatView({
     stopScript();
 
     if (mode === "now") {
-      void api("/api/chat/admin/script", { scriptContent: resolved.map(({ line, persona }) => `[${normTime(line.time) || nowHM()}] ${persona.username}: ${line.text.trim()}`).join("\n") })
-        .then(refreshMessages)
-        .then(() => showToast(`✓ ${resolved.length} messages inserted${skipped ? ` (${skipped} skipped)` : ""}.`))
-        .catch((e) => showToast(String(e)));
+      try {
+        await Promise.all(resolved.map(({ line, persona }) => pushMessage(persona, line.text.trim(), normTime(line.time))));
+        showToast(`✓ ${resolved.length} messages inserted${skipped ? ` (${skipped} skipped)` : ""}.`);
+      } catch (e) { showToast(String(e)); return false; }
       return true;
     }
 
@@ -1192,7 +1197,7 @@ export function CommunityChatView({
     resolved.forEach(({ line, persona }, i) => {
       acc += Math.max(0, line.delay) * 1000;
       const t = window.setTimeout(() => {
-        void pushMessage(persona, line.text.trim(), normTime(line.time));
+      void pushMessage(persona, line.text.trim(), normTime(line.time));
         if (i === resolved.length - 1) {
           timers.current = [];
           setPlaying(false);
@@ -1209,20 +1214,29 @@ export function CommunityChatView({
     return true;
   };
 
-  const saveScript = (name: string, lines: ScriptLine[]) => {
-    // TODO: call your API here (save script)
-    setScripts((prev) => [
+  const saveScript = async (name: string, lines: ScriptLine[]) => {
+    const next = [
       { id: `s${Date.now()}`, name, lines },
-      ...prev.filter((s) => s.name.toLowerCase() !== name.toLowerCase()),
-    ]);
+      ...scripts.filter((s) => s.name.toLowerCase() !== name.toLowerCase()),
+    ];
+    setScripts(next);
+    try { localStorage.setItem("community-chat-scripts", JSON.stringify(next)); }
+    catch { showToast("Could not save scripts in this browser."); return; }
     showToast(`✓ Script “${name}” saved.`);
   };
 
   const deleteScript = (id: string) => {
-    // TODO: call your API here (delete script)
-    setScripts((prev) => prev.filter((s) => s.id !== id));
+    const next = scripts.filter((s) => s.id !== id);
+    setScripts(next);
+    try { localStorage.setItem("community-chat-scripts", JSON.stringify(next)); }
+    catch { showToast("Could not update saved scripts."); return; }
     showToast("Script deleted.");
   };
+
+  useEffect(() => {
+    try { const saved = localStorage.getItem("community-chat-scripts"); if (saved) setScripts(JSON.parse(saved)); }
+    catch { localStorage.removeItem("community-chat-scripts"); }
+  }, []);
 
   /* ---------- message actions ---------- */
 
@@ -1334,7 +1348,7 @@ export function CommunityChatView({
       showToast("Add at least one community rule.");
       return;
     }
-    try { await api("/api/chat/admin/rules", { rules: cleaned }); }
+    try { await api("/api/chat/admin/rules", { rules: cleaned, blockedWords: wordDraft }); }
     catch (e) { showToast(String(e)); return; }
     setRules(cleaned);
     setBlocked(wordDraft);

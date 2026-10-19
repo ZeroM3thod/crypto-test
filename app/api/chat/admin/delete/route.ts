@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { bad, getSession, supabase } from "@/lib/auth/backend";
+import { bad, getSession, q, supabase } from "@/lib/auth/backend";
 
 export async function POST(req: NextRequest) {
   const session = await getSession(req);
@@ -8,15 +8,12 @@ export async function POST(req: NextRequest) {
   }
 
   const { messageId, reason } = await req.json();
-  if (!messageId || !reason?.trim()) return bad("Message ID and reason are required");
+  if (typeof messageId !== "string" || typeof reason !== "string" || !reason.trim()) return bad("Message ID and reason are required");
 
-  await supabase(`rpc/delete_chat_message`, {
-    method: "POST",
-    body: JSON.stringify({
-      p_message_id: messageId,
-      p_admin_id: session.user.id,
-      p_reason: reason.trim(),
-    }),
+  await supabase(`chat_messages?id=eq.${q(messageId)}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ deleted: true, deleted_at: new Date().toISOString(), deleted_by: session.user.id, deleted_reason: reason.trim() }),
   });
 
   return Response.json({ ok: true });

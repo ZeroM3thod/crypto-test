@@ -8,7 +8,9 @@ export async function POST(req: NextRequest) {
   }
 
   const { scriptContent } = await req.json();
-  if (!scriptContent?.trim()) return bad("Script content is required");
+  if (typeof scriptContent !== "string" || !scriptContent.trim() || scriptContent.length > 50000) return bad("Script content is required (max 50000 characters)");
+  const lines = scriptContent.trim().split(/\r?\n/);
+  if (lines.length > 100 || lines.some((line: string) => line.trim() && !/^\[\d{2}:\d{2}\]\s+[^:]{1,24}:\s+.{1,2000}$/.test(line.trim()))) return bad("Script lines must use [HH:MM] username: message format (max 100 lines)");
 
   const count = await supabase<{ count: number }[]>(`rpc/insert_script_messages`, {
     method: "POST",

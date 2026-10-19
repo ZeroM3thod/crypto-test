@@ -257,6 +257,7 @@ export default function CommunityChat() {
   const [replyTo, setReplyTo] = useState<ChatMessageData | null>(null);
   const [reportTarget, setReportTarget] = useState<ChatMessageData | null>(null);
   const [reportReason, setReportReason] = useState("");
+  const [hydrated, setHydrated] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [modNotice, setModNotice] = useState<string | null>(null);
@@ -273,6 +274,7 @@ export default function CommunityChat() {
   const scrollerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => () => window.clearTimeout(modTimer.current), []);
+  useEffect(() => setHydrated(true), []);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -356,7 +358,7 @@ export default function CommunityChat() {
       if (res.ok) {
         const rows = await res.json();
         setHasOlder(rows.length === 15);
-        const older = rows.map((m: any) => ({ id: m.id, userId: m.user_id || "system", username: m.username || "User", avatar: m.first_name?.[0] || "U", avatarUrl: m.avatar_url, text: m.message, timestamp: new Date(m.created_at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }), createdAt: m.created_at, own: Boolean(m.own), pinned: m.pinned, admin: m.is_admin }));
+        const older = rows.map((m: any) => ({ id: m.id, userId: m.user_id || "system", username: m.username || "User", avatar: m.first_name?.[0] || "U", avatarUrl: m.avatar_url, text: m.message, timestamp: new Date(m.created_at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }), createdAt: m.created_at, own: Boolean(m.own), pinned: m.pinned, admin: m.is_admin, replyText: m.reply_to?.message, replyUsername: m.reply_to?.username }));
         setMessages((prev) => [...older.filter((m: ChatMessageData) => !prev.some((p) => p.id === m.id)), ...prev]);
         requestAnimationFrame(() => { if (el) el.scrollTop += el.scrollHeight - height; });
       }
@@ -384,8 +386,8 @@ export default function CommunityChat() {
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        setModNotice(data.message || "Failed to send message");
+        const data = await res.json().catch(() => null);
+        setModNotice(data?.message || `Failed to send${replyTo ? " reply" : " message"}.`);
         window.clearTimeout(modTimer.current);
         modTimer.current = window.setTimeout(() => setModNotice(null), 3000);
         return;
@@ -394,7 +396,7 @@ export default function CommunityChat() {
       setInput("");
       setReplyTo(null);
     } catch (err: any) {
-      setModNotice(err.message || "Failed to send message");
+      setModNotice(err.message || `Failed to send${replyTo ? " reply" : " message"}.`);
       window.clearTimeout(modTimer.current);
       modTimer.current = window.setTimeout(() => setModNotice(null), 3000);
     }
@@ -460,7 +462,7 @@ export default function CommunityChat() {
           {/* ── Input ─────────────────────────────────────── */}
           <div className="shrink-0 border-t border-border p-3">
             <div className="relative mx-auto flex max-w-3xl items-center gap-2">
-              {replyTo && <div className="absolute bottom-full left-0 right-0 mb-2 flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-xs"><span>Replying to <b>{replyTo.username}</b>: {replyTo.text.slice(0, 80)}</span><button type="button" aria-label="Cancel reply" onClick={() => setReplyTo(null)}><X className="size-4" /></button></div>}
+              {replyTo && <div className="absolute bottom-full left-0 right-0 mb-2 flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-xs"><span className="truncate">Replying to <b>{replyTo.username}</b>: {replyTo.text.slice(0, 80)}</span><button type="button" aria-label="Cancel reply" onClick={() => setReplyTo(null)}><X className="size-4" /></button></div>}
               {emojiOpen && (
                 <EmojiPicker
                   onSelect={(e) => setInput((p) => p + e)}
@@ -486,7 +488,7 @@ export default function CommunityChat() {
                 size="icon"
                 className="shrink-0 rounded-full"
                 onClick={handleSend}
-                disabled={!input.trim()}
+                disabled={hydrated && !input.trim()}
               >
                 <SendHorizonal />
               </Button>
