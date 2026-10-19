@@ -243,6 +243,7 @@ export default function CommunityChat() {
   const [modNotice, setModNotice] = useState<string | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [onlineCount, setOnlineCount] = useState(0);
+  const onlineBase = useRef(0);
   const [rules, setRules] = useState<string[]>([]);
   const [pinnedMsg, setPinnedMsg] = useState<ChatMessageData | null>(null);
   const [hasOlder, setHasOlder] = useState(true);
@@ -253,6 +254,13 @@ export default function CommunityChat() {
   const scrollerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => () => window.clearTimeout(modTimer.current), []);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setOnlineCount(Math.max(0, onlineBase.current + Math.floor(Math.random() * 11) - 5));
+    }, 2000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   // Fetch messages from backend
   useEffect(() => {
@@ -299,7 +307,8 @@ export default function CommunityChat() {
           const onlineData = await onlineRes.json();
           if (active) {
             setOnlineUsers(onlineData.users || []);
-            setOnlineCount(onlineData.count || 0);
+            onlineBase.current = onlineData.count || 0;
+            setOnlineCount(onlineBase.current);
           }
         }
       } catch (err) {
