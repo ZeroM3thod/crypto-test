@@ -10,6 +10,10 @@ import {
   ChevronDown,
   ChevronUp,
   Globe,
+  MoreVertical,
+  Reply,
+  Copy,
+  Flag,
   Pin,
   SendHorizonal,
   Smile,
@@ -39,6 +43,8 @@ type ChatMessageData = {
   pinned?: boolean;
   admin?: boolean;
   avatarUrl?: string;
+  replyText?: string;
+  replyUsername?: string;
 };
 
 type OnlineUser = {
@@ -199,13 +205,14 @@ function EmojiPicker({
   );
 }
 
-function MessageBubble({ msg }: { msg: ChatMessageData }) {
+function MessageBubble({ msg, onReply, onReport }: { msg: ChatMessageData; onReply: (msg: ChatMessageData) => void; onReport: (msg: ChatMessageData) => void }) {
+  const [menuOpen, setMenuOpen] = useState(false);
   return (
     <div className={`flex items-end gap-2 ${msg.own ? "flex-row-reverse self-end" : "self-start"} max-w-[85%]`}>
       <div className="size-7 shrink-0">
         <AvatarGlyph letter={msg.avatar} src={msg.avatarUrl} />
       </div>
-      <div className={msg.own ? "text-right" : ""}>
+      <div className={`relative ${msg.own ? "text-right" : ""}`}>
         <div className={`mb-1 flex items-center gap-1.5 text-[10px] text-muted-foreground ${msg.own ? "justify-end" : ""}`}>
           <span className="font-medium text-muted-foreground">{msg.own ? "You" : msg.username}</span>
           {msg.admin && <span className="rounded-full bg-white px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-black">Admin</span>}
@@ -217,6 +224,8 @@ function MessageBubble({ msg }: { msg: ChatMessageData }) {
           )}
           <span>{msg.timestamp}</span>
         </div>
+        {msg.replyText && <div className="mb-1 rounded border-l-2 border-primary bg-muted/60 px-2 py-1 text-left text-[11px]"><b>{msg.replyUsername}</b><p className="truncate">{msg.replyText}</p></div>}
+        <div className="flex items-start gap-1">
         <div
           className={`inline-block rounded-lg px-3 py-2 text-sm leading-relaxed ${
             msg.own
@@ -225,6 +234,13 @@ function MessageBubble({ msg }: { msg: ChatMessageData }) {
           }`}
         >
           {msg.text}
+        </div>
+        <button type="button" aria-label="Message options" onClick={() => setMenuOpen((v) => !v)} className="rounded p-1 text-muted-foreground hover:bg-muted"><MoreVertical className="size-4" /></button>
+        {menuOpen && <div className="absolute right-0 top-full z-20 min-w-32 rounded-lg border border-border bg-card p-1 text-left shadow-lg">
+          <button className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-muted" onClick={() => { onReply(msg); setMenuOpen(false); }}><Reply className="size-3.5" />Reply</button>
+          <button className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-muted" onClick={() => { void navigator.clipboard.writeText(msg.text); setMenuOpen(false); }}><Copy className="size-3.5" />Copy</button>
+          {!msg.own && <button className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs text-destructive hover:bg-muted" onClick={() => { onReport(msg); setMenuOpen(false); }}><Flag className="size-3.5" />Report</button>}
+        </div>}
         </div>
       </div>
     </div>
@@ -238,6 +254,9 @@ export default function CommunityChat() {
   const [chatLoading, setChatLoading] = useState(true);
   const [chatError, setChatError] = useState<string | null>(null);
   const [input, setInput] = useState("");
+  const [replyTo, setReplyTo] = useState<ChatMessageData | null>(null);
+  const [reportTarget, setReportTarget] = useState<ChatMessageData | null>(null);
+  const [reportReason, setReportReason] = useState("");
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [modNotice, setModNotice] = useState<string | null>(null);
@@ -288,6 +307,8 @@ export default function CommunityChat() {
             own: Boolean(m.own),
             pinned: m.pinned,
             admin: m.is_admin,
+            replyText: m.reply_to?.message,
+            replyUsername: m.reply_to?.username,
           }));
           if (!active) return;
           setMessages((prev) => prev.length ? [...prev.filter((m) => !formatted.some((n: ChatMessageData) => n.id === m.id)), ...formatted] : formatted);
@@ -359,7 +380,7 @@ export default function CommunityChat() {
       const res = await fetch("/api/chat/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmed }),
+        body: JSON.stringify({ message: trimmed, replyTo: replyTo?.id }),
       });
 
       if (!res.ok) {
@@ -371,12 +392,20 @@ export default function CommunityChat() {
       }
 
       setInput("");
+      setReplyTo(null);
     } catch (err: any) {
       setModNotice(err.message || "Failed to send message");
       window.clearTimeout(modTimer.current);
       modTimer.current = window.setTimeout(() => setModNotice(null), 3000);
     }
-  }, [input]);
+  }, [input, replyTo]);
+
+  const submitReport = async () => {
+    if (!reportTarget || !reportReason.trim()) return;
+    const res = await fetch("/api/chat/report", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messageId: reportTarget.id, reason: reportReason.trim() }) });
+    setModNotice(res.ok ? "Report sent for admin review." : "Could not submit report.");
+    setReportTarget(null); setReportReason("");
+  };
 
   return (
     <UserShell active="Community">
@@ -422,7 +451,7 @@ export default function CommunityChat() {
           <div ref={scrollerRef} onScroll={(e) => { const el = e.currentTarget; if (el.scrollTop < 80) void loadOlder(); setShowLatest(el.scrollHeight - el.scrollTop - el.clientHeight > 120); }} className="relative min-h-0 flex-1 overflow-y-auto px-3 py-5 sm:px-5">
             <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col gap-3">
               {chatLoading ? <p className="m-auto text-sm text-muted-foreground">Loading chat…</p> : chatError && messages.length === 0 ? <p className="m-auto text-sm text-muted-foreground">{chatError}</p> : messages.length === 0 ? <p className="m-auto text-sm text-muted-foreground">No messages yet.</p> : messages.map((msg) => (
-                <MessageBubble key={msg.id} msg={msg} />
+                <MessageBubble key={msg.id} msg={msg} onReply={setReplyTo} onReport={setReportTarget} />
               ))}
             </div>
             {showLatest && <button type="button" aria-label="Jump to latest messages" onClick={() => { scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: "smooth" }); setShowLatest(false); }} className="sticky bottom-3 float-right mr-3 grid size-10 place-items-center rounded-full border border-border bg-card shadow-lg"><ChevronDown className="size-5" /></button>}
@@ -431,6 +460,7 @@ export default function CommunityChat() {
           {/* ── Input ─────────────────────────────────────── */}
           <div className="shrink-0 border-t border-border p-3">
             <div className="relative mx-auto flex max-w-3xl items-center gap-2">
+              {replyTo && <div className="absolute bottom-full left-0 right-0 mb-2 flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-xs"><span>Replying to <b>{replyTo.username}</b>: {replyTo.text.slice(0, 80)}</span><button type="button" aria-label="Cancel reply" onClick={() => setReplyTo(null)}><X className="size-4" /></button></div>}
               {emojiOpen && (
                 <EmojiPicker
                   onSelect={(e) => setInput((p) => p + e)}
@@ -465,6 +495,7 @@ export default function CommunityChat() {
         </div>
 
       </div>
+      {reportTarget && <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4"><div role="dialog" aria-modal="true" aria-labelledby="report-title" className="w-full max-w-sm space-y-3 rounded-xl border border-border bg-card p-4"><h2 id="report-title" className="font-semibold">Report message</h2><p className="text-xs text-muted-foreground">{reportTarget.username}: {reportTarget.text}</p><textarea autoFocus value={reportReason} onChange={(e) => setReportReason(e.target.value)} maxLength={1000} placeholder="Why are you reporting this message?" className="min-h-24 w-full rounded border border-border bg-background p-2 text-sm"/><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setReportTarget(null)}>Cancel</Button><Button disabled={!reportReason.trim()} onClick={submitReport}>Submit report</Button></div></div></div>}
     </UserShell>
   );
 }

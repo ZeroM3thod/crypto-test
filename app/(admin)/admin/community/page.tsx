@@ -6,12 +6,13 @@ import { avatarForUser, supabase } from "@/lib/auth/backend";
 
 async function getChatData() {
   try {
-    const [messages, users, bans, rules, settings] = await Promise.all([
+    const [messages, users, bans, rules, settings, reports] = await Promise.all([
       supabase<any[]>(`chat_messages?select=*&deleted=eq.false&order=created_at.asc&limit=100`),
       supabase<any[]>(`auth_users?select=id,first_name,last_name,user_id&limit=100`),
       supabase<any[]>(`chat_bans?select=*&active=eq.true`),
       supabase<any[]>(`community_rules?select=rule_text&order=rule_order.asc`),
       supabase<any[]>(`chat_settings?select=key,value`),
+      supabase<any[]>(`chat_reports?select=id,message_id,reported_by,reason,status,created_at,chat_messages(id,user_id,username,message)&status=in.(pending,seen)&order=created_at.desc`),
     ]);
 
     const formattedMessages = messages.map((m: any) => ({
@@ -49,6 +50,7 @@ async function getChatData() {
       users: formattedUsers,
       bans: formattedBans,
       rules: rules.map((r: any) => r.rule_text),
+      reports,
     };
   } catch (err) {
     console.error("Failed to fetch chat data:", err);
@@ -80,6 +82,7 @@ export default async function AdminCommunityPage() {
         initialRules={data.rules}
         initialBlockedWords={[]}
         initialScripts={[]}
+        initialReports={data.reports || []}
       />
     </AdminShell>
   );

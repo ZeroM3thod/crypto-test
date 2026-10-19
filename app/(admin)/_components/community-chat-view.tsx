@@ -350,32 +350,36 @@ function SidePanel({
   bans,
   onBan,
   onUnban,
+  reports,
+  onReportDetails,
 }: {
-  tab: "online" | "banned";
-  onTab: (t: "online" | "banned") => void;
+  tab: "reports" | "banned";
+  onTab: (t: "reports" | "banned") => void;
   online: ChatUser[];
   onlineCount: number;
   onEditCount: () => void;
   bans: Ban[];
   onBan: (u: { userId: string; username: string }) => void;
   onUnban: (b: Ban) => void;
+  reports: any[];
+  onReportDetails: (report: any) => void;
 }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="border-b border-border p-3">
         <Tabs
           value={tab}
-          onValueChange={(v) => onTab(v as "online" | "banned")}
+          onValueChange={(v) => onTab(v as "reports" | "banned")}
           variant="segment"
         >
           <TabsList>
-            <TabsTrigger value="online">Online ({onlineCount})</TabsTrigger>
+            <TabsTrigger value="reports">Reports ({reports.filter((r) => r.status === "pending").length})</TabsTrigger>
             <TabsTrigger value="banned">Banned ({bans.length})</TabsTrigger>
           </TabsList>
         </Tabs>
-        {tab === "online" ? (
+        {tab === "reports" ? (
           <p className="mt-2 flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
-            <span>Listing {online.length} real members</span>
+            <span>Reported messages awaiting review</span>
             <button
               type="button"
               onClick={onEditCount}
@@ -389,38 +393,11 @@ function SidePanel({
       </div>
 
       <div className="flex-1 overflow-y-auto py-2">
-        {tab === "online" ? (
-          online.length ? (
-            online.map((u) => (
-              <div
-                key={u.id}
-                className="flex items-center gap-2 px-4 py-2 transition-colors hover:bg-muted/50"
-              >
-                <div className="relative size-7 shrink-0">
-                  <AvatarGlyph letter={u.avatar} src={u.avatar.startsWith("/") ? u.avatar : undefined} />
-                  <span className="absolute -bottom-0.5 -right-0.5 size-2 rounded-full border border-background bg-(--color-success)" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[11px] font-medium text-foreground">
-                    {u.username}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground">
-                    {u.lang}
-                    {isCustom(u.id) ? " · Persona" : ""}
-                  </p>
-                </div>
-                <IconBtn
-                  label={`Ban ${u.username}`}
-                  onClick={() => onBan({ userId: u.id, username: u.username })}
-                >
-                  <BanIcon className="size-3.5" />
-                </IconBtn>
-              </div>
-            ))
+        {tab === "reports" ? (
+          reports.length ? (
+            reports.map((r) => <div key={r.id} className="flex items-center justify-between gap-2 border-b border-border px-3 py-3"><div className="min-w-0"><p className="truncate text-xs font-medium">{r.chat_messages?.username || "Reported user"}</p><p className="truncate text-[10px] text-muted-foreground">{r.chat_messages?.message}</p>{r.status === "seen" && <span className="text-[9px] text-muted-foreground">Seen</span>}</div><Button size="sm" variant="outline" onClick={() => onReportDetails(r)}>Details</Button></div>)
           ) : (
-            <p className="p-4 text-center text-xs text-muted-foreground">
-              Nobody online.
-            </p>
+            <p className="p-4 text-center text-xs text-muted-foreground">No reports.</p>
           )
         ) : bans.length ? (
           bans.map((b) => (
@@ -902,6 +879,7 @@ export function CommunityChatView({
   initialRules,
   initialBlockedWords,
   initialScripts,
+  initialReports,
 }: {
   initialMessages: ChatMessage[];
   users: ChatUser[];
@@ -909,10 +887,12 @@ export function CommunityChatView({
   initialRules: string[];
   initialBlockedWords: string[];
   initialScripts: SavedScript[];
+  initialReports: any[];
 }) {
   const { toast, showToast } = useToast();
 
   const [messages, setMessages] = useState(initialMessages);
+  const [reports, setReports] = useState(initialReports);
   const [bans, setBans] = useState(initialBans);
   const [rules, setRules] = useState(initialRules);
   const [blocked, setBlocked] = useState(initialBlockedWords);
@@ -927,6 +907,13 @@ export function CommunityChatView({
     if (!response.ok) throw new Error("Could not refresh messages");
     const rows = await response.json();
     setMessages(rows.map((m: any) => ({ id: m.id, userId: m.user_id || "admin", username: m.username || `${m.first_name || "Admin"}_${m.last_name?.[0] || "U"}`, avatar: m.avatar || m.first_name?.[0] || "A", text: m.message, timestamp: new Date(m.created_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }), admin: m.is_admin, pinned: m.pinned })));
+  };
+  const refreshReports = async () => { const res = await fetch("/api/chat/admin/reports"); if (res.ok) setReports(await res.json()); };
+  const reviewReport = async (reportId: string, action: "dismiss" | "ban" | "seen") => {
+    const reason = action === "ban" ? window.prompt("Permanent ban reason:") : "";
+    if (action === "ban" && !reason?.trim()) return;
+    try { await api("/api/chat/admin/reports", { reportId, action, reason }); await refreshReports(); if (action !== "seen") setReportDetail(null); showToast(action === "ban" ? "User banned; report reviewed." : action === "seen" ? "Marked as seen." : "Report dismissed."); }
+    catch (e) { showToast(String(e)); }
   };
 
   // online count override (null = automatic)
@@ -951,7 +938,8 @@ export function CommunityChatView({
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sideTab, setSideTab] = useState<"online" | "banned">("online");
+  const [sideTab, setSideTab] = useState<"reports" | "banned">("reports");
+  const [reportDetail, setReportDetail] = useState<any>(null);
 
   // ban dialog
   const [banTarget, setBanTarget] = useState<{
@@ -1377,12 +1365,17 @@ export function CommunityChatView({
       bans={activeBans}
       onBan={openBan}
       onUnban={unban}
+      reports={reports}
+      onReportDetails={(report) => { setReportDetail(report); if (report.status === "pending") void reviewReport(report.id, "seen"); }}
     />
   );
 
   return (
     <>
       <Toast toast={toast} />
+      <Dialog open={!!reportDetail} onClose={() => setReportDetail(null)} maxWidth="max-w-lg">
+        {reportDetail && <><DialogHeader title="Report details" subtitle={`Reported ${fmtUTC(reportDetail.created_at)}`} onClose={() => setReportDetail(null)} /><div className="space-y-4 p-5"><div><p className={LABEL_CLS}>Reported message</p><p className="mt-1 rounded-lg bg-muted/50 p-3 text-sm">{reportDetail.chat_messages?.message}</p></div><div><p className={LABEL_CLS}>Reason</p><p className="mt-1 text-sm">{reportDetail.reason}</p></div><div className="flex justify-end gap-2"><Button size="sm" variant="outline" onClick={() => void reviewReport(reportDetail.id, "dismiss")}>Do not ban · Dismiss</Button><Button size="sm" variant="primary" onClick={() => void reviewReport(reportDetail.id, "ban")}>Ban user</Button></div></div></>}
+      </Dialog>
 
       {/* ---------- personas + script dialogs ---------- */}
       <PersonasDialog

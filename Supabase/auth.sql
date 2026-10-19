@@ -2074,11 +2074,14 @@ create table if not exists public.chat_reports (
   message_id uuid not null references public.chat_messages(id) on delete cascade,
   reported_by uuid not null references public.auth_users(id) on delete cascade,
   reason text not null,
-  status text not null default 'pending' check (status in ('pending', 'reviewed', 'dismissed')),
+  status text not null default 'pending' check (status in ('pending', 'seen', 'reviewed', 'dismissed')),
   reviewed_by uuid references public.auth_users(id) on delete set null,
   reviewed_at timestamptz,
   created_at timestamptz not null default now()
 );
+
+alter table public.chat_reports drop constraint if exists chat_reports_status_check;
+alter table public.chat_reports add constraint chat_reports_status_check check (status in ('pending', 'seen', 'reviewed', 'dismissed'));
 
 -- Indexes
 create index if not exists chat_messages_created_idx on public.chat_messages (created_at desc);

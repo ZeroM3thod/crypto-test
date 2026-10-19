@@ -6,8 +6,10 @@ export async function POST(req: NextRequest) {
   if (!session) return bad("Unauthorized", 401);
 
   const { messageId, reason } = await req.json();
-  if (!messageId || !reason?.trim()) return bad("Message ID and reason are required");
+  if (typeof messageId !== "string" || typeof reason !== "string" || !reason.trim() || reason.length > 1000) return bad("Message ID and a valid reason are required");
 
+  const [message] = await supabase<any[]>(`chat_messages?select=id& id=eq.${encodeURIComponent(messageId)}&limit=1`.replace("& id", "&id"));
+  if (!message) return bad("Message not found", 404);
   await supabase("chat_reports", {
     method: "POST",
     headers: { Prefer: "return=minimal" },

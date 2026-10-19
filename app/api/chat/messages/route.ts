@@ -19,12 +19,16 @@ export async function GET(req: NextRequest) {
     .filter((m, index, rows) => rows.findIndex((row) => row.id === m.id) === index)
     .slice(0, limit);
 
+  const replyIds = [...new Set(messages.map((m) => m.reply_to).filter(Boolean))];
+  const replies = replyIds.length ? await supabase<any[]>(`chat_messages?select=id,username,message&id=in.(${replyIds.map(q).join(",")})`) : [];
+  const replyById = new Map(replies.map((r) => [r.id, r]));
   return Response.json(messages.reverse().map((m) => ({
     ...m,
     own: String(m.user_id) === String(session.user.id),
     username: m.username || `${m.first_name || "User"}_${m.last_name?.[0] || "U"}`,
     avatar_url: m.is_admin ? avatarForUser(m.user_id || "admin") : avatarForUser(m.username || m.user_id || "admin"),
     avatar: m.is_admin ? avatarForUser(m.user_id || "admin") : avatarForUser(m.username || m.user_id || "admin"),
+    reply_to: replyById.get(m.reply_to) || null,
   })));
 }
 
@@ -33,13 +37,18 @@ export async function POST(req: NextRequest) {
   if (!session) return bad("Unauthorized", 401);
 
   const { message, replyTo, persona } = await req.json();
-  if (!message?.trim()) return bad("Message is required");
+  if (typeof message !== "string" || !message.trim()) return bad("Message is required");
   if (message.trim().length > 2000) return bad("Message is too long");
 
   // Check if user is banned
   const isAdmin = session.user.role === "admin" || session.user.role === "owner";
   const personaName = typeof persona?.username === "string" ? persona.username.trim().slice(0, 24) : "";
   if (persona && (!isAdmin || !personaName || personaName.toLowerCase() === "admin")) return bad("Invalid persona", 400);
+  if (replyTo) {
+    if (typeof replyTo !== "string") return bad("Invalid reply target");
+    const [target] = await supabase<any[]>(`chat_messages?select=id&id=eq.${q(replyTo)}&deleted=eq.false&limit=1`);
+    if (!target) return bad("Reply target not found", 404);
+  }
   const bans = isAdmin ? [] : await supabase<any[]>(
     `chat_bans?select=id&user_id=eq.${q(session.user.id)}&active=eq.true&limit=1`
   );
