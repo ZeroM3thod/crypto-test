@@ -455,7 +455,6 @@ export default function CommunityChat() {
           </div>
         </div>
 
-        <OnlineSidebar users={onlineUsers} onlineCount={onlineCount} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       </div>
     </UserShell>
   );
