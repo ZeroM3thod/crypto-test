@@ -944,6 +944,7 @@ export function CommunityChatView({
   const [scriptOpen, setScriptOpen] = useState(false);
   const [scripts, setScripts] = useState(initialScripts);
   const [playing, setPlaying] = useState(false);
+  const [transferring, setTransferring] = useState(false);
   const timers = useRef<number[]>([]);
 
   const [input, setInput] = useState("");
@@ -1096,6 +1097,17 @@ export function CommunityChatView({
     await pushMessage(activePersona, text);
     setInput("");
   }, [input, activePersona, pushMessage]);
+
+  const transferChat = async () => {
+    setTransferring(true);
+    try {
+      const response = await fetch("/api/chat/admin/export");
+      if (!response.ok) throw new Error("Could not export chat data");
+      const data = await response.json();
+      showToast(`✓ Backed up ${data.transferred} messages to db/chat-archive.json; removed from Supabase.`);
+    } catch (e) { showToast(String(e)); }
+    finally { setTransferring(false); }
+  };
 
   /* ---------- persona management ---------- */
 
@@ -1659,6 +1671,9 @@ export function CommunityChatView({
             title="Community Chat"
             description="Read all messages, post as Admin or any member, run scripted conversations, pin, ban and manage the rules."
           />
+          <Button size="sm" variant="outline" disabled={transferring} onClick={transferChat}>
+            {transferring ? "Preparing JSON…" : "Transfer chat data"}
+          </Button>
         </div>
 
         <div className="flex h-[calc(100dvh-15rem)] min-h-[560px] overflow-hidden rounded-2xl border border-border bg-card">

@@ -23,11 +23,11 @@ async function sha256(value: string) {
 /**
  * Resolve the signed-in user on the server.
  */
-export async function getSessionUser(): Promise<SessionUser | null> {
+export async function getSessionUser(tokenOverride?: string): Promise<SessionUser | null> {
   try {
     // Get session token from cookies
     const cookieStore = await cookies();
-    const token = cookieStore.get("session_token")?.value;
+    const token = tokenOverride ?? cookieStore.get("session_token")?.value;
     
     if (token) {
       // Verify token exists in auth_sessions and is not expired/revoked

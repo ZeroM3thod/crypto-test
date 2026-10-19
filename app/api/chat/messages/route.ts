@@ -1,16 +1,23 @@
 import { NextRequest } from "next/server";
+import { readChatArchive } from "@/lib/chat-archive";
 import { avatarForUser, bad, getSession, q, supabase } from "@/lib/auth/backend";
 
 export async function GET(req: NextRequest) {
   const session = await getSession(req);
   if (!session) return bad("Unauthorized", 401);
 
-  const parsedLimit = Number(req.nextUrl.searchParams.get("limit") || 100);
-  const limit = String(Number.isInteger(parsedLimit) ? Math.min(200, Math.max(1, parsedLimit)) : 100);
-  
-  const messages = await supabase<any[]>(
-    `chat_messages?select=id,user_id,username,first_name,last_name,message,is_admin,pinned,deleted,deleted_reason,reply_to,created_at&deleted=eq.false&order=created_at.desc&limit=${q(limit)}`
-  );
+  const parsedLimit = Number(req.nextUrl.searchParams.get("limit") || 15);
+  const limit = Number.isInteger(parsedLimit) ? Math.min(100, Math.max(1, parsedLimit)) : 15;
+  const before = req.nextUrl.searchParams.get("before");
+  const cursorFilter = before ? `&created_at=lt.${encodeURIComponent(before)}` : "";
+  const [live, archived] = await Promise.all([supabase<any[]>(
+    `chat_messages?select=id,user_id,username,first_name,last_name,message,is_admin,pinned,deleted,deleted_reason,reply_to,created_at&deleted=eq.false${cursorFilter}&order=created_at.desc&limit=${q(String(limit))}`
+  ), readChatArchive()]);
+  const archiveFiltered = archived.filter((m) => !m.deleted && (!before || m.created_at < before));
+  const messages = [...archiveFiltered, ...live]
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .filter((m, index, rows) => rows.findIndex((row) => row.id === m.id) === index)
+    .slice(0, limit);
 
   return Response.json(messages.reverse().map((m) => ({
     ...m,

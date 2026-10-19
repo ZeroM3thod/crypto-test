@@ -15,7 +15,7 @@ export async function middleware(req: NextRequest) {
   }
 
   // Role-based access control
-  const session = await getSessionUser();
+  const session = await getSessionUser(req.cookies.get("session_token")?.value);
 
   // Owner routes - ONLY owner can access
   if (pathname.startsWith("/owner")) {

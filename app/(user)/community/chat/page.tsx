@@ -33,6 +33,7 @@ type ChatMessageData = {
   avatar: string;
   text: string;
   timestamp: string;
+  createdAt?: string;
   lang?: string;
   own?: boolean;
   pinned?: boolean;
@@ -244,17 +245,14 @@ export default function CommunityChat() {
   const [onlineCount, setOnlineCount] = useState(0);
   const [rules, setRules] = useState<string[]>([]);
   const [pinnedMsg, setPinnedMsg] = useState<ChatMessageData | null>(null);
+  const [hasOlder, setHasOlder] = useState(true);
+  const [showLatest, setShowLatest] = useState(false);
+  const loadingOlder = useRef(false);
 
   const modTimer = useRef<number | undefined>(undefined);
   const scrollerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => () => window.clearTimeout(modTimer.current), []);
-
-  useEffect(() => {
-    if (scrollerRef.current) {
-      scrollerRef.current.scrollTop = scrollerRef.current.scrollHeight;
-    }
-  }, [messages]);
 
   // Fetch messages from backend
   useEffect(() => {
@@ -262,7 +260,7 @@ export default function CommunityChat() {
     const fetchData = async () => {
       try {
         const [msgRes, rulesRes, onlineRes] = await Promise.all([
-          fetch("/api/chat/messages"),
+          fetch("/api/chat/messages?limit=15"),
           fetch("/api/chat/rules"),
           fetch("/api/chat/online"),
         ]);
@@ -277,13 +275,15 @@ export default function CommunityChat() {
             avatarUrl: m.avatar_url || undefined,
             text: m.message,
             timestamp: new Date(m.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
+            createdAt: m.created_at,
             lang: "EN",
             own: Boolean(m.own),
             pinned: m.pinned,
             admin: m.is_admin,
           }));
           if (!active) return;
-          setMessages(formatted);
+          setMessages((prev) => prev.length ? [...prev.filter((m) => !formatted.some((n: ChatMessageData) => n.id === m.id)), ...formatted] : formatted);
+          setHasOlder(data.length === 15 && !messages.some((m) => m.createdAt === data[0]?.created_at));
           setChatError(null);
           
           const pinned = formatted.find((m: ChatMessageData) => m.pinned);
@@ -314,6 +314,24 @@ export default function CommunityChat() {
     const interval = setInterval(fetchData, 3000);
     return () => { active = false; clearInterval(interval); };
   }, []);
+
+  const loadOlder = async () => {
+    if (loadingOlder.current || !hasOlder || !messages.length) return;
+    loadingOlder.current = true;
+    const el = scrollerRef.current;
+    const height = el?.scrollHeight ?? 0;
+    try {
+      const before = encodeURIComponent(messages[0].createdAt || "");
+      const res = await fetch(`/api/chat/messages?limit=15&before=${before}`);
+      if (res.ok) {
+        const rows = await res.json();
+        setHasOlder(rows.length === 15);
+        const older = rows.map((m: any) => ({ id: m.id, userId: m.user_id || "system", username: m.username || "User", avatar: m.first_name?.[0] || "U", avatarUrl: m.avatar_url, text: m.message, timestamp: new Date(m.created_at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }), createdAt: m.created_at, own: Boolean(m.own), pinned: m.pinned, admin: m.is_admin }));
+        setMessages((prev) => [...older.filter((m: ChatMessageData) => !prev.some((p) => p.id === m.id)), ...prev]);
+        requestAnimationFrame(() => { if (el) el.scrollTop += el.scrollHeight - height; });
+      }
+    } finally { loadingOlder.current = false; }
+  };
 
   const handleSend = useCallback(async () => {
     const trimmed = input.trim();
@@ -392,12 +410,13 @@ export default function CommunityChat() {
           )}
 
           {/* ── Messages ─────────────────────────────────── */}
-          <div ref={scrollerRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-5 sm:px-5">
+          <div ref={scrollerRef} onScroll={(e) => { const el = e.currentTarget; if (el.scrollTop < 80) void loadOlder(); setShowLatest(el.scrollHeight - el.scrollTop - el.clientHeight > 120); }} className="relative min-h-0 flex-1 overflow-y-auto px-3 py-5 sm:px-5">
             <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col gap-3">
               {chatLoading ? <p className="m-auto text-sm text-muted-foreground">Loading chat…</p> : chatError && messages.length === 0 ? <p className="m-auto text-sm text-muted-foreground">{chatError}</p> : messages.length === 0 ? <p className="m-auto text-sm text-muted-foreground">No messages yet.</p> : messages.map((msg) => (
                 <MessageBubble key={msg.id} msg={msg} />
               ))}
             </div>
+            {showLatest && <button type="button" aria-label="Jump to latest messages" onClick={() => { scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: "smooth" }); setShowLatest(false); }} className="sticky bottom-3 float-right mr-3 grid size-10 place-items-center rounded-full border border-border bg-card shadow-lg"><ChevronDown className="size-5" /></button>}
           </div>
 
           {/* ── Input ─────────────────────────────────────── */}
