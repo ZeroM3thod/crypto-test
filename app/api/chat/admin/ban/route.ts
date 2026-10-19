@@ -7,16 +7,13 @@ export async function POST(req: NextRequest) {
     return bad("Unauthorized", 403);
   }
 
-  const { userId, reason } = await req.json();
+  const { userId, reason, expiresAt } = await req.json();
   if (!userId || !reason?.trim()) return bad("User ID and reason are required");
-
-  await supabase(`rpc/ban_user_from_chat`, {
+  if (expiresAt != null && (!Number.isFinite(Date.parse(expiresAt)) || Date.parse(expiresAt) <= Date.now())) return bad("Ban expiry must be in the future");
+  await supabase("chat_bans", {
     method: "POST",
-    body: JSON.stringify({
-      p_user_id: userId,
-      p_admin_id: session.user.id,
-      p_reason: reason.trim(),
-    }),
+    headers: { Prefer: "return=minimal,resolution=merge-duplicates" },
+    body: JSON.stringify({ user_id: userId, admin_id: session.user.id, reason: reason.trim(), active: true, banned_at: new Date().toISOString(), expires_at: expiresAt || null }),
   });
 
   return Response.json({ ok: true });

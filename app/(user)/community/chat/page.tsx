@@ -36,6 +36,8 @@ type ChatMessageData = {
   lang?: string;
   own?: boolean;
   pinned?: boolean;
+  admin?: boolean;
+  avatarUrl?: string;
 };
 
 type OnlineUser = {
@@ -43,6 +45,7 @@ type OnlineUser = {
   username: string;
   avatar: string;
   lang: string;
+  avatarUrl?: string;
 };
 
 const EMOJIS = ["😀", "😂", "🔥", "🚀", "📈", "💰", "👍", "🎉", "💎", "⚡", "🌙", "💯"];
@@ -51,11 +54,9 @@ const PROFANITY = ["badword1", "badword2"];
 
 // ── Small building blocks ────────────────────────────────────────────────
 
-function AvatarGlyph({ letter }: { letter: string }) {
+function AvatarGlyph({ letter, src }: { letter: string; src?: string }) {
   return (
-    <span className="grid size-full place-items-center rounded-full border border-border text-[11px] font-semibold">
-      {letter.toUpperCase()}
-    </span>
+    src ? <img src={src} alt="" className="size-full rounded-full border border-border object-cover" /> : <span className="grid size-full place-items-center rounded-full border border-border text-[11px] font-semibold">{letter.toUpperCase()}</span>
   );
 }
 
@@ -118,7 +119,7 @@ function OnlineSidebar({
       {users.map((u) => (
         <div key={u.id} className="flex items-center gap-2 px-4 py-2 transition-colors hover:bg-muted/50">
           <div className="relative size-7 shrink-0">
-            <AvatarGlyph letter={u.avatar} />
+            <AvatarGlyph letter={u.avatar} src={u.avatarUrl} />
             <span className="absolute -bottom-0.5 -right-0.5 size-2 rounded-full border border-background bg-foreground" />
           </div>
           <div className="min-w-0 flex-1">
@@ -201,11 +202,12 @@ function MessageBubble({ msg }: { msg: ChatMessageData }) {
   return (
     <div className={`flex items-end gap-2 ${msg.own ? "flex-row-reverse self-end" : "self-start"} max-w-[85%]`}>
       <div className="size-7 shrink-0">
-        <AvatarGlyph letter={msg.avatar} />
+        <AvatarGlyph letter={msg.avatar} src={msg.avatarUrl} />
       </div>
       <div className={msg.own ? "text-right" : ""}>
         <div className={`mb-1 flex items-center gap-1.5 text-[10px] text-muted-foreground ${msg.own ? "justify-end" : ""}`}>
           <span className="font-medium text-muted-foreground">{msg.own ? "You" : msg.username}</span>
+          {msg.admin && <span className="rounded-full bg-white px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-black">Admin</span>}
           {msg.lang && (
             <span className="inline-flex items-center gap-0.5">
               <Globe className="size-2.5" />
@@ -232,6 +234,8 @@ function MessageBubble({ msg }: { msg: ChatMessageData }) {
 
 export default function CommunityChat() {
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
+  const [chatLoading, setChatLoading] = useState(true);
+  const [chatError, setChatError] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -254,6 +258,7 @@ export default function CommunityChat() {
 
   // Fetch messages from backend
   useEffect(() => {
+    let active = true;
     const fetchData = async () => {
       try {
         const [msgRes, rulesRes, onlineRes] = await Promise.all([
@@ -267,38 +272,47 @@ export default function CommunityChat() {
           const formatted = data.map((m: any) => ({
             id: m.id,
             userId: m.user_id || "system",
-            username: `${m.first_name}_${m.last_name?.charAt(0) || "U"}`,
+            username: m.username || `${m.first_name || "User"}_${m.last_name?.charAt(0) || "U"}`,
             avatar: m.first_name?.charAt(0) || "U",
+            avatarUrl: m.avatar_url || undefined,
             text: m.message,
             timestamp: new Date(m.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
             lang: "EN",
-            own: false, // ponytail: match with current user_id
+            own: Boolean(m.own),
             pinned: m.pinned,
+            admin: m.is_admin,
           }));
+          if (!active) return;
           setMessages(formatted);
+          setChatError(null);
           
           const pinned = formatted.find((m: ChatMessageData) => m.pinned);
-          if (pinned) setPinnedMsg(pinned);
-        }
+          setPinnedMsg(pinned || null);
+        } else if (active) setChatError("Unable to load chat messages.");
 
         if (rulesRes.ok) {
           const rulesData = await rulesRes.json();
-          setRules(rulesData.map((r: any) => r.rule_text));
+          if (active) setRules(rulesData.map((r: any) => r.rule_text));
         }
 
         if (onlineRes.ok) {
           const onlineData = await onlineRes.json();
-          setOnlineUsers(onlineData.users);
-          setOnlineCount(onlineData.count);
+          if (active) {
+            setOnlineUsers(onlineData.users || []);
+            setOnlineCount(onlineData.count || 0);
+          }
         }
       } catch (err) {
         console.error("Failed to fetch chat data:", err);
+        if (active) setChatError("Unable to connect to chat. Retrying…");
+      } finally {
+        if (active) setChatLoading(false);
       }
     };
 
     fetchData();
     const interval = setInterval(fetchData, 3000);
-    return () => clearInterval(interval);
+    return () => { active = false; clearInterval(interval); };
   }, []);
 
   const handleSend = useCallback(async () => {
@@ -380,7 +394,7 @@ export default function CommunityChat() {
           {/* ── Messages ─────────────────────────────────── */}
           <div ref={scrollerRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-5 sm:px-5">
             <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col gap-3">
-              {messages.map((msg) => (
+              {chatLoading ? <p className="m-auto text-sm text-muted-foreground">Loading chat…</p> : chatError && messages.length === 0 ? <p className="m-auto text-sm text-muted-foreground">{chatError}</p> : messages.length === 0 ? <p className="m-auto text-sm text-muted-foreground">No messages yet.</p> : messages.map((msg) => (
                 <MessageBubble key={msg.id} msg={msg} />
               ))}
             </div>

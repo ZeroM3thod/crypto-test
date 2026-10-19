@@ -1,17 +1,24 @@
 import { NextRequest } from "next/server";
-import { bad, getSession, q, supabase } from "@/lib/auth/backend";
+import { avatarForUser, bad, getSession, q, supabase } from "@/lib/auth/backend";
 
 export async function GET(req: NextRequest) {
   const session = await getSession(req);
   if (!session) return bad("Unauthorized", 401);
 
-  const limit = req.nextUrl.searchParams.get("limit") || "100";
+  const parsedLimit = Number(req.nextUrl.searchParams.get("limit") || 100);
+  const limit = String(Number.isInteger(parsedLimit) ? Math.min(200, Math.max(1, parsedLimit)) : 100);
   
   const messages = await supabase<any[]>(
     `chat_messages?select=id,user_id,username,first_name,last_name,message,is_admin,pinned,deleted,deleted_reason,reply_to,created_at&deleted=eq.false&order=created_at.desc&limit=${q(limit)}`
   );
 
-  return Response.json(messages.reverse());
+  return Response.json(messages.reverse().map((m) => ({
+    ...m,
+    own: String(m.user_id) === String(session.user.id),
+    username: m.username || `${m.first_name || "User"}_${m.last_name?.[0] || "U"}`,
+    avatar_url: avatarForUser(m.user_id || "admin"),
+    avatar: avatarForUser(m.user_id || "admin"),
+  })));
 }
 
 export async function POST(req: NextRequest) {
@@ -20,9 +27,11 @@ export async function POST(req: NextRequest) {
 
   const { message, replyTo } = await req.json();
   if (!message?.trim()) return bad("Message is required");
+  if (message.trim().length > 2000) return bad("Message is too long");
 
   // Check if user is banned
-  const bans = await supabase<any[]>(
+  const isAdmin = session.user.role === "admin" || session.user.role === "owner";
+  const bans = isAdmin ? [] : await supabase<any[]>(
     `chat_bans?select=id&user_id=eq.${q(session.user.id)}&active=eq.true&limit=1`
   );
   if (bans.length > 0) return bad("You are banned from chat", 403);
@@ -33,7 +42,7 @@ export async function POST(req: NextRequest) {
   );
   const isLocked = settings?.value === true || settings?.value === "true";
   
-  if (isLocked && session.user.role !== "admin" && session.user.role !== "owner") {
+  if (isLocked && !isAdmin) {
     return bad("Chat is currently locked", 403);
   }
 

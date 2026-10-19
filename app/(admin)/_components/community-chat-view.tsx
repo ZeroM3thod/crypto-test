@@ -104,11 +104,9 @@ const banLabel = (b: Ban) =>
 
 /* ---------- small building blocks ---------- */
 
-function AvatarGlyph({ letter }: { letter: string }) {
+function AvatarGlyph({ letter, src }: { letter: string; src?: string }) {
   return (
-    <span className="grid size-full place-items-center rounded-full border border-border bg-background text-[11px] font-semibold text-foreground">
-      {letter.toUpperCase()}
-    </span>
+    src ? <img src={src} alt="" className="size-full rounded-full border border-border bg-background object-cover" /> : <span className="grid size-full place-items-center rounded-full border border-border bg-background text-[11px] font-semibold text-foreground">{letter.toUpperCase()}</span>
   );
 }
 
@@ -267,7 +265,7 @@ function MessageBubble({
       }`}
     >
       <div className="size-7 shrink-0">
-        <AvatarGlyph letter={msg.avatar} />
+        <AvatarGlyph letter={msg.avatar} src={msg.avatar.startsWith("/") ? msg.avatar : undefined} />
       </div>
       <div className={admin ? "text-right" : ""}>
         <div
@@ -399,7 +397,7 @@ function SidePanel({
                 className="flex items-center gap-2 px-4 py-2 transition-colors hover:bg-muted/50"
               >
                 <div className="relative size-7 shrink-0">
-                  <AvatarGlyph letter={u.avatar} />
+                  <AvatarGlyph letter={u.avatar} src={u.avatar.startsWith("/") ? u.avatar : undefined} />
                   <span className="absolute -bottom-0.5 -right-0.5 size-2 rounded-full border border-background bg-(--color-success)" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -431,7 +429,7 @@ function SidePanel({
               className="flex items-start gap-2 border-b border-border px-4 py-3 last:border-b-0"
             >
               <div className="size-7 shrink-0">
-                <AvatarGlyph letter={b.avatar} />
+                <AvatarGlyph letter={b.avatar} src={b.avatar.startsWith("/") ? b.avatar : undefined} />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[11px] font-medium text-foreground">
@@ -535,7 +533,7 @@ function PersonasDialog({
                   className="flex items-center gap-3 border-b border-border p-3 last:border-b-0"
                 >
                   <div className="size-7 shrink-0">
-                    <AvatarGlyph letter={p.avatar} />
+                    <AvatarGlyph letter={p.avatar} src={p.avatar.startsWith("/") ? p.avatar : undefined} />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-foreground">
@@ -919,9 +917,21 @@ export function CommunityChatView({
   const [rules, setRules] = useState(initialRules);
   const [blocked, setBlocked] = useState(initialBlockedWords);
   const [locked, setLocked] = useState(false);
+  const api = async (url: string, body: unknown) => {
+    const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!response.ok) throw new Error((await response.json()).message || "Request failed");
+    return response.json();
+  };
+  const refreshMessages = async () => {
+    const response = await fetch("/api/chat/messages");
+    if (!response.ok) throw new Error("Could not refresh messages");
+    const rows = await response.json();
+    setMessages(rows.map((m: any) => ({ id: m.id, userId: m.user_id || "admin", username: m.username || `${m.first_name || "Admin"}_${m.last_name?.[0] || "U"}`, avatar: m.avatar || m.first_name?.[0] || "A", text: m.message, timestamp: new Date(m.created_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }), admin: m.is_admin, pinned: m.pinned })));
+  };
 
   // online count override (null = automatic)
   const [onlineOverride, setOnlineOverride] = useState<number | null>(null);
+  const [onlineCountLive, setOnlineCount] = useState<number | null>(null);
   const [onlineOpen, setOnlineOpen] = useState(false);
   const [onlineMode, setOnlineMode] = useState<"auto" | "custom">("auto");
   const [onlineDraft, setOnlineDraft] = useState("");
@@ -968,6 +978,24 @@ export function CommunityChatView({
     return () => clearInterval(t);
   }, []);
 
+  useEffect(() => {
+    const refresh = async () => {
+      try {
+        await refreshMessages();
+        const [onlineRes, settingsRes] = await Promise.all([fetch("/api/chat/online"), fetch("/api/chat/admin/lock")]);
+        if (onlineRes.ok) {
+          const data = await onlineRes.json();
+          setOnlineCount(data.count || 0);
+          setOnlineOverride(data.override == null ? null : Number(data.override));
+        }
+        if (settingsRes.ok) setLocked((await settingsRes.json()).locked);
+      } catch (e) { console.error("Community refresh failed", e); }
+    };
+    refresh();
+    const timer = window.setInterval(refresh, 5000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   /* stop any running script when leaving the page */
   useEffect(
     () => () => {
@@ -1004,7 +1032,7 @@ export function CommunityChatView({
   const postable = useMemo(() => [ADMIN_PERSONA, ...online], [online]);
   const activePersona = postable.find((p) => p.id === personaId) ?? ADMIN_PERSONA;
 
-  const onlineCount = onlineOverride ?? online.length;
+  const onlineCount = onlineOverride ?? onlineCountLive ?? online.length;
 
   const openOnline = () => {
     setOnlineMode(onlineOverride === null ? "auto" : "custom");
@@ -1016,9 +1044,9 @@ export function CommunityChatView({
   const bumpOnline = (delta: number) =>
     setOnlineDraft((v) => String(Math.max(0, (Number(v) || 0) + delta)));
 
-  const saveOnline = () => {
+  const saveOnline = async () => {
     if (onlineMode === "auto") {
-      // TODO: call your API here (clear the online count override)
+      try { await api("/api/chat/admin/online-count", { count: null }); } catch (e) { showToast(String(e)); return; }
       setOnlineOverride(null);
       showToast("✓ Online count is automatic again.");
       closeOnline();
@@ -1029,7 +1057,7 @@ export function CommunityChatView({
       showToast("Enter a whole number between 0 and 100,000.");
       return;
     }
-    // TODO: call your API here (save the online count override)
+    try { await api("/api/chat/admin/online-count", { count: n }); } catch (e) { showToast(String(e)); return; }
     setOnlineOverride(n);
     showToast(`✓ Online count set to ${n.toLocaleString()}.`);
     closeOnline();
@@ -1057,28 +1085,15 @@ export function CommunityChatView({
 
   /* ---------- posting (local state only — no DB) ---------- */
 
-  const pushMessage = useCallback((p: ChatUser, text: string, ts?: string) => {
-    // TODO: call your API here (post message as Admin or on behalf of a persona)
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: `m${Date.now()}-${uid()}`,
-        userId: p.id,
-        username: p.username,
-        avatar: p.avatar,
-        lang: p.id === "admin" ? undefined : p.lang,
-        admin: p.id === "admin",
-        fake: p.id !== "admin",
-        text,
-        timestamp: ts || nowHM(),
-      },
-    ]);
-  }, []);
+  const pushMessage = useCallback(async (_p: ChatUser, text: string, _ts?: string) => {
+    try { await api("/api/chat/messages", { message: text }); await refreshMessages(); }
+    catch (e) { showToast(String(e)); }
+  }, [showToast]);
 
-  const handleSend = useCallback(() => {
+  const handleSend = useCallback(async () => {
     const text = input.trim();
     if (!text) return;
-    pushMessage(activePersona, text);
+    await pushMessage(activePersona, text);
     setInput("");
   }, [input, activePersona, pushMessage]);
 
@@ -1165,14 +1180,10 @@ export function CommunityChatView({
     stopScript();
 
     if (mode === "now") {
-      resolved.forEach(({ line, persona }) =>
-        pushMessage(persona, line.text.trim(), normTime(line.time)),
-      );
-      showToast(
-        `✓ ${resolved.length} messages inserted${
-          skipped ? ` (${skipped} skipped — banned/removed user)` : ""
-        }.`,
-      );
+      void api("/api/chat/admin/script", { scriptContent: resolved.map(({ line, persona }) => `[${normTime(line.time) || nowHM()}] ${persona.username}: ${line.text.trim()}`).join("\n") })
+        .then(refreshMessages)
+        .then(() => showToast(`✓ ${resolved.length} messages inserted${skipped ? ` (${skipped} skipped)` : ""}.`))
+        .catch((e) => showToast(String(e)));
       return true;
     }
 
@@ -1181,7 +1192,7 @@ export function CommunityChatView({
     resolved.forEach(({ line, persona }, i) => {
       acc += Math.max(0, line.delay) * 1000;
       const t = window.setTimeout(() => {
-        pushMessage(persona, line.text.trim(), normTime(line.time));
+        void pushMessage(persona, line.text.trim(), normTime(line.time));
         if (i === resolved.length - 1) {
           timers.current = [];
           setPlaying(false);
@@ -1215,18 +1226,17 @@ export function CommunityChatView({
 
   /* ---------- message actions ---------- */
 
-  const togglePin = (m: ChatMessage) => {
-    // TODO: call your API here (pin / unpin) — one pinned message at a time
-    setMessages((prev) =>
-      prev.map((x) => ({ ...x, pinned: x.id === m.id ? !m.pinned : false })),
-    );
+  const togglePin = async (m: ChatMessage) => {
+    try { await api("/api/chat/admin/pin", { messageId: m.id, pinned: !m.pinned }); await refreshMessages(); }
+    catch (e) { showToast(String(e)); return; }
     showToast(m.pinned ? "Message unpinned." : "📌 Message pinned.");
   };
 
-  const deleteMessage = (m: ChatMessage) => {
-    if (!window.confirm(`Delete this message from ${m.username}?`)) return;
-    // TODO: call your API here (delete message)
-    setMessages((prev) => prev.filter((x) => x.id !== m.id));
+  const deleteMessage = async (m: ChatMessage) => {
+    const reason = window.prompt(`Reason for deleting ${m.username}'s message?`);
+    if (!reason?.trim()) return;
+    try { await api("/api/chat/admin/delete", { messageId: m.id, reason }); await refreshMessages(); }
+    catch (e) { showToast(String(e)); return; }
     showToast("✕ Message deleted.");
   };
 
@@ -1240,14 +1250,16 @@ export function CommunityChatView({
   };
   const closeBan = useCallback(() => setBanTarget(null), []);
 
-  const confirmBan = () => {
+  const confirmBan = async () => {
     if (!banTarget) return;
     if (banReason.trim().length < 5) {
       showToast("Please enter a ban reason (at least 5 characters).");
       return;
     }
-    // TODO: call your API here (ban user)
     const d = DURATIONS.find((x) => x.id === banDuration)!;
+    const expiresAt = d.ms === null ? null : new Date(Date.now() + d.ms).toISOString();
+    try { await api("/api/chat/admin/ban", { userId: banTarget.userId, reason: banReason.trim(), expiresAt }); }
+    catch (e) { showToast(String(e)); return; }
     const nowMs = Date.now();
     const source = lookup(banTarget.userId);
     const ban: Ban = {
@@ -1261,7 +1273,10 @@ export function CommunityChatView({
     };
     setBans((prev) => [ban, ...prev.filter((b) => b.userId !== ban.userId)]);
     if (banDeleteMsgs) {
-      setMessages((prev) => prev.filter((m) => m.userId !== ban.userId));
+      try {
+        for (const m of messages.filter((m) => m.userId === ban.userId)) await api("/api/chat/admin/delete", { messageId: m.id, reason: `Deleted with ban: ${banReason.trim()}` });
+        await refreshMessages();
+      } catch (e) { showToast(`Banned; message deletion incomplete: ${String(e)}`); }
     }
     showToast(
       `✕ ${ban.username} banned ${
@@ -1272,8 +1287,9 @@ export function CommunityChatView({
     closeBan();
   };
 
-  const unban = (b: Ban) => {
-    // TODO: call your API here (unban user)
+  const unban = async (b: Ban) => {
+    try { await api("/api/chat/admin/unban", { userId: b.userId }); }
+    catch (e) { showToast(String(e)); return; }
     setBans((prev) => prev.filter((x) => x.userId !== b.userId));
     showToast(`✓ ${b.username} has been unbanned.`);
   };
@@ -1312,13 +1328,14 @@ export function CommunityChatView({
     setNewWord("");
   };
 
-  const saveRules = () => {
+  const saveRules = async () => {
     const cleaned = ruleDraft.map((r) => r.trim()).filter(Boolean);
     if (cleaned.length === 0) {
       showToast("Add at least one community rule.");
       return;
     }
-    // TODO: call your API here (save rules + blocked words)
+    try { await api("/api/chat/admin/rules", { rules: cleaned }); }
+    catch (e) { showToast(String(e)); return; }
     setRules(cleaned);
     setBlocked(wordDraft);
     showToast("✓ Rules updated.");
@@ -1327,8 +1344,9 @@ export function CommunityChatView({
 
   /* ---------- lock chat ---------- */
 
-  const toggleLock = () => {
-    // TODO: call your API here (lock / unlock chat for users)
+  const toggleLock = async () => {
+    try { await api("/api/chat/admin/lock", { locked: !locked }); }
+    catch (e) { showToast(String(e)); return; }
     setLocked((v) => !v);
     showToast(
       locked

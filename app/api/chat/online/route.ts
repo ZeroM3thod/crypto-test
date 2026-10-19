@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { bad, getSession, q, supabase } from "@/lib/auth/backend";
+import { avatarForUser, bad, getSession, q, supabase } from "@/lib/auth/backend";
 
 export async function GET(req: NextRequest) {
   const session = await getSession(req);
@@ -18,8 +18,10 @@ export async function GET(req: NextRequest) {
 
   const onlineUsers = users.map(u => ({
     id: u.user_id,
-    username: `${u.auth_users.first_name}_${u.auth_users.last_name?.charAt(0) || "U"}`,
-    avatar: u.auth_users.first_name?.charAt(0) || "U",
+    username: `${u.auth_users?.first_name || "User"}_${u.auth_users?.last_name?.charAt(0) || "U"}`,
+    avatarUrl: avatarForUser(u.user_id),
+    avatar: avatarForUser(u.user_id),
+    lang: "EN",
   }));
 
   // Get count with override
@@ -32,5 +34,5 @@ export async function GET(req: NextRequest) {
     count = parseInt(String(countSetting.value));
   }
 
-  return Response.json({ users: onlineUsers, count });
+  return Response.json({ users: onlineUsers, count, override: countSetting?.value && countSetting.value !== "null" ? countSetting.value : null });
 }
