@@ -1085,8 +1085,8 @@ export function CommunityChatView({
 
   /* ---------- posting (local state only — no DB) ---------- */
 
-  const pushMessage = useCallback(async (_p: ChatUser, text: string, _ts?: string) => {
-    try { await api("/api/chat/messages", { message: text }); await refreshMessages(); }
+  const pushMessage = useCallback(async (p: ChatUser, text: string, _ts?: string) => {
+    try { await api("/api/chat/messages", { message: text, ...(p.id !== "admin" ? { persona: { username: p.username, avatar: p.avatar } } : {}) }); await refreshMessages(); }
     catch (e) { showToast(String(e)); }
   }, [showToast]);
 

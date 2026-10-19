@@ -16,8 +16,8 @@ export async function GET(req: NextRequest) {
     ...m,
     own: String(m.user_id) === String(session.user.id),
     username: m.username || `${m.first_name || "User"}_${m.last_name?.[0] || "U"}`,
-    avatar_url: avatarForUser(m.user_id || "admin"),
-    avatar: avatarForUser(m.user_id || "admin"),
+    avatar_url: m.is_admin ? avatarForUser(m.user_id || "admin") : avatarForUser(m.username || m.user_id || "admin"),
+    avatar: m.is_admin ? avatarForUser(m.user_id || "admin") : avatarForUser(m.username || m.user_id || "admin"),
   })));
 }
 
@@ -25,12 +25,14 @@ export async function POST(req: NextRequest) {
   const session = await getSession(req);
   if (!session) return bad("Unauthorized", 401);
 
-  const { message, replyTo } = await req.json();
+  const { message, replyTo, persona } = await req.json();
   if (!message?.trim()) return bad("Message is required");
   if (message.trim().length > 2000) return bad("Message is too long");
 
   // Check if user is banned
   const isAdmin = session.user.role === "admin" || session.user.role === "owner";
+  const personaName = typeof persona?.username === "string" ? persona.username.trim().slice(0, 24) : "";
+  if (persona && (!isAdmin || !personaName || personaName.toLowerCase() === "admin")) return bad("Invalid persona", 400);
   const bans = isAdmin ? [] : await supabase<any[]>(
     `chat_bans?select=id&user_id=eq.${q(session.user.id)}&active=eq.true&limit=1`
   );
@@ -58,11 +60,11 @@ export async function POST(req: NextRequest) {
     headers: { Prefer: "return=representation" },
     body: JSON.stringify({
       user_id: session.user.id,
-      username: `${session.user.first_name}_${session.user.last_name?.charAt(0) || "U"}`,
-      first_name: session.user.first_name,
-      last_name: session.user.last_name || "U",
+      username: personaName || `${session.user.first_name}_${session.user.last_name?.charAt(0) || "U"}`,
+      first_name: personaName ? personaName.split(/[ _]/)[0] : session.user.first_name,
+      last_name: personaName ? (personaName.split(/[ _]/).slice(1).join(" ") || "U") : (session.user.last_name || "U"),
       message: message.trim(),
-      is_admin: session.user.role === "admin" || session.user.role === "owner",
+      is_admin: !personaName && isAdmin,
       reply_to: replyTo || null,
     }),
   });
