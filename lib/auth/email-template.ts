@@ -1,6 +1,6 @@
 /**
  * Verification-code email. No branding or site name.
- * Layout follows the reference design; every colour comes from globals.css (dark theme tokens).
+ * Every colour comes from globals.css (dark theme tokens), with white as the accent.
  */
 
 export type OtpPurpose = "signup" | "login" | "reset" | (string & {});
@@ -11,53 +11,48 @@ export type OtpEmailInput = {
   firstName?: string;
   /** Minutes until the code expires. Default 10. */
   expiresInMinutes?: number;
+  /**
+   * Base URL of your app (e.g. https://example.com). Used for the "Copy code" button,
+   * which opens `${appUrl}/copy#CODE`. Defaults to process.env.APP_URL.
+   * If neither is set, the button is left out.
+   */
+  appUrl?: string;
 };
 
-// globals.css dark tokens
 const C = {
   background: "#151515",
   foreground: "#ededed",
   border: "#2a2a2a",
   muted: "#1f1f1f",
   mutedForeground: "#a1a1aa",
-  primary: "#ffffff",
+  accent: "#ffffff",
   card: "#1c1c1c",
-  chartFg: "#71717a",
 };
 
 const SERIF = "'Cormorant Garamond',Georgia,'Times New Roman',serif";
 const SANS = "'DM Sans',Arial,Helvetica,sans-serif";
 const MONO = "'SF Mono',SFMono-Regular,ui-monospace,Menlo,Consolas,'Liberation Mono',monospace";
 
-const COPY: Record<
-  string,
-  { subject: string; before: string; accent: string; tagline: string; lead: string; sub: string; ignore: string }
-> = {
+const COPY: Record<string, { subject: string; before: string; accent: string; lead: string; ignore: string }> = {
   signup: {
     subject: "Verify your email",
     before: "Confirm Your",
     accent: "Email",
-    tagline: "One step away from your account",
-    lead: "Your account has been created. Enter the code below to verify your email address.",
-    sub: "Verifying your email activates your account and keeps it secure.",
+    lead: "Enter the code below to verify your email address and activate your account.",
     ignore: "If you did not create an account, you can safely ignore this email.",
   },
   login: {
     subject: "Your sign-in code",
     before: "Your",
     accent: "Sign-in Code",
-    tagline: "Finish signing in",
     lead: "Enter the code below to finish signing in to your account.",
-    sub: "This code can only be used once.",
     ignore: "If this wasn’t you, ignore this email and consider changing your password.",
   },
   reset: {
     subject: "Reset your password",
     before: "Reset Your",
     accent: "Password",
-    tagline: "Choose a new password",
     lead: "Enter the code below to choose a new password for your account.",
-    sub: "This code can only be used once.",
     ignore: "If you didn’t request a reset, ignore this email. Your password won’t change.",
   },
 };
@@ -76,13 +71,13 @@ export function renderOtpEmail(input: OtpEmailInput) {
   const copy = COPY[input.purpose || "signup"] || COPY.signup;
   const code = String(input.code).replace(/\s+/g, "");
   const name = input.firstName ? esc(input.firstName.trim()) : "";
+  const base = (input.appUrl || process.env.APP_URL || "").replace(/\/+$/, "");
+  const copyUrl = base ? `${base}/copy#${encodeURIComponent(code)}` : "";
 
   const subject = copy.subject;
   const preheader = `Your verification code is ${code}. It expires in ${minutes} minutes.`;
 
-  const rule = (color: string) =>
-    `background:${color};background-image:linear-gradient(90deg,transparent,${color},transparent);`;
-  const bar = `background:${C.primary};background-image:linear-gradient(90deg,transparent,${C.primary} 30%,${C.primary} 70%,transparent);`;
+  const bar = `background:${C.accent};background-image:linear-gradient(90deg,transparent,${C.accent} 30%,${C.accent} 70%,transparent);`;
 
   const digits = code
     .split("")
@@ -94,14 +89,19 @@ export function renderOtpEmail(input: OtpEmailInput) {
     )
     .join("");
 
-  const infoCell = (title: string, sub: string, middle = false) => `
-                      <td width="33%" style="text-align:center;padding:0 8px;${
-                        middle ? `border-left:1px solid ${C.border};border-right:1px solid ${C.border};` : ""
-                      }">
-                        <p style="margin:0 0 6px;font-family:${SERIF};font-size:20px;color:${C.primary};">&#10022;</p>
-                        <p style="margin:0;font-family:${SANS};font-size:11px;font-weight:400;letter-spacing:0.1em;text-transform:uppercase;color:${C.foreground};">${title}</p>
-                        <p style="margin:4px 0 0;font-family:${SANS};font-size:11px;font-weight:300;color:${C.mutedForeground};">${sub}</p>
-                      </td>`;
+  const button = copyUrl
+    ? `
+                  <!-- Copy button -->
+                  <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin-bottom:24px;">
+                    <tr>
+                      <td style="background-color:${C.accent};border-radius:4px;text-align:center;">
+                        <a href="${esc(copyUrl)}" target="_blank" style="display:inline-block;padding:14px 40px;font-family:${SANS};font-size:12px;font-weight:500;letter-spacing:0.12em;text-transform:uppercase;color:${C.background};text-decoration:none;">
+                          Copy code
+                        </a>
+                      </td>
+                    </tr>
+                  </table>`
+    : "";
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -144,59 +144,27 @@ export function renderOtpEmail(input: OtpEmailInput) {
 
             <table width="100%" cellpadding="0" cellspacing="0" border="0">
               <tr>
-                <td class="px" style="padding:52px 48px 0;">
-
-                  <!-- Icon badge -->
-                  <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin-bottom:32px;">
-                    <tr>
-                      <td style="background:${C.muted};border:1px solid ${C.border};border-radius:50%;width:72px;height:72px;text-align:center;vertical-align:middle;">
-                        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-top:20px;">
-                          <circle cx="16" cy="16" r="14" stroke="${C.primary}" stroke-width="1.2" stroke-dasharray="3 2"/>
-                          <path d="M10 16.5L14 20.5L22 12" stroke="${C.primary}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                      </td>
-                    </tr>
-                  </table>
+                <td class="px" style="padding:52px 48px 44px;">
 
                   <!-- Headline -->
-                  <h1 class="h1" style="font-family:${SERIF};font-size:32px;font-weight:400;color:${C.foreground};text-align:center;margin:0 0 12px;line-height:1.2;letter-spacing:-0.01em;">
-                    ${esc(copy.before)} <em style="font-style:italic;color:${C.primary};">${esc(copy.accent)}</em>
+                  <h1 class="h1" style="font-family:${SERIF};font-size:32px;font-weight:400;color:${C.foreground};text-align:center;margin:0 0 24px;line-height:1.2;letter-spacing:-0.01em;">
+                    ${esc(copy.before)} <em style="font-style:italic;color:${C.accent};">${esc(copy.accent)}</em>
                   </h1>
-                  <p style="font-family:${SANS};font-size:13px;font-weight:300;color:${C.mutedForeground};text-align:center;letter-spacing:0.1em;text-transform:uppercase;margin:0 0 36px;">${esc(copy.tagline)}</p>
-
-                  <!-- Rule -->
-                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:36px;">
-                    <tr><td height="1" style="height:1px;line-height:1px;font-size:0;${rule(C.border)}">&nbsp;</td></tr>
-                  </table>
 
                   <!-- Body text -->
-                  <p style="font-family:${SANS};font-size:15px;font-weight:300;color:${C.foreground};line-height:1.8;margin:0 0 16px;text-align:center;">
+                  <p style="font-family:${SANS};font-size:15px;font-weight:300;color:${C.foreground};line-height:1.8;margin:0 0 32px;text-align:center;">
                     ${name ? `Hi ${name}. ` : ""}${esc(copy.lead)}
-                  </p>
-                  <p style="font-family:${SANS};font-size:15px;font-weight:300;color:${C.mutedForeground};line-height:1.8;margin:0 0 36px;text-align:center;">
-                    ${esc(copy.sub)}
                   </p>
 
                   <!-- Code -->
-                  <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin-bottom:20px;">
+                  <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin-bottom:24px;-webkit-user-select:all;user-select:all;">
                     <tr>${digits}
                     </tr>
                   </table>
-
-                  <p style="font-family:${SANS};font-size:12px;color:${C.mutedForeground};text-align:center;line-height:1.8;margin:0 0 44px;">
+${button}
+                  <p style="font-family:${SANS};font-size:12px;color:${C.mutedForeground};text-align:center;line-height:1.8;margin:0;">
                     This code expires in <strong style="color:${C.foreground};font-weight:500;">${minutes} minutes</strong>.
                   </p>
-
-                  <!-- Divider -->
-                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:32px;">
-                    <tr><td height="1" style="height:1px;line-height:1px;font-size:0;${rule(C.border)}">&nbsp;</td></tr>
-                  </table>
-
-                  <!-- Info row -->
-                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:48px;">
-                    <tr>${infoCell("Single-use", "One-time code")}${infoCell("Time-limited", `${minutes} minutes`, true)}${infoCell("Private", "Never share it")}
-                    </tr>
-                  </table>
 
                 </td>
               </tr>
@@ -205,12 +173,9 @@ export function renderOtpEmail(input: OtpEmailInput) {
             <!-- FOOTER -->
             <table width="100%" cellpadding="0" cellspacing="0" border="0">
               <tr>
-                <td class="px" style="background-color:${C.muted};border-top:1px solid ${C.border};padding:28px 48px;border-radius:0 0 4px 4px;text-align:center;">
-                  <p style="margin:0 0 10px;font-family:${SANS};font-size:12px;font-weight:300;color:${C.mutedForeground};line-height:1.8;">
+                <td class="px" style="background-color:${C.muted};border-top:1px solid ${C.border};padding:24px 48px;border-radius:0 0 4px 4px;text-align:center;">
+                  <p style="margin:0;font-family:${SANS};font-size:12px;font-weight:300;color:${C.mutedForeground};line-height:1.8;">
                     ${esc(copy.ignore)}
-                  </p>
-                  <p style="margin:0;font-family:${SANS};font-size:10px;font-weight:300;color:${C.chartFg};letter-spacing:0.08em;text-transform:uppercase;">
-                    Automated message &middot; Please do not reply
                   </p>
                 </td>
               </tr>
@@ -242,7 +207,6 @@ export function renderOtpEmail(input: OtpEmailInput) {
     `Your code: ${code}`,
     `Expires in ${minutes} minutes.`,
     "",
-    "Never share this code with anyone.",
     copy.ignore,
   ].join("\n");
 
