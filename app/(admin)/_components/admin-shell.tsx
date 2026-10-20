@@ -208,8 +208,8 @@ export function AdminShell({ active: initialActive, children }: AdminShellProps)
       >
         <AnimatedSidebarHeader className="p-3 pb-2">
           <div className="flex min-h-11 items-center gap-0 overflow-hidden px-2">
-            <Image src="/icon/bright.png" alt="" aria-hidden="true" unoptimized width={48} height={48} className="pointer-events-none absolute left-8 z-0 size-12 rounded-lg object-contain light:block dark:hidden" />
-            <Image src="/icon/dark.png" alt="" aria-hidden="true" unoptimized width={48} height={48} className="pointer-events-none absolute left-8 z-0 hidden size-12 rounded-lg object-contain light:hidden dark:block" />
+            <Image src="/icon/bright.png" alt="" aria-hidden="true" unoptimized width={48} height={48} className="pointer-events-none absolute left-8 z-0 size-12 rounded-lg object-contain" style={{ display: "var(--brand-bright-display, block)" }} />
+            <Image src="/icon/dark.png" alt="" aria-hidden="true" unoptimized width={48} height={48} className="pointer-events-none absolute left-8 z-0 size-12 rounded-lg object-contain" style={{ display: "var(--brand-dark-display, none)" }} />
             <button
               type="button"
               onClick={() => {

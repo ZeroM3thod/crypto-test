@@ -28,6 +28,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     root.classList.add(resolved);
     root.setAttribute("data-theme", resolved);
     root.style.colorScheme = resolved;
+    root.style.setProperty("--brand-bright-display", resolved === "light" ? "block" : "none");
+    root.style.setProperty("--brand-dark-display", resolved === "dark" ? "block" : "none");
   }, []);
 
   const resolve = useCallback((t: Theme): ResolvedTheme => {
