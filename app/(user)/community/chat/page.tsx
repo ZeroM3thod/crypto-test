@@ -237,7 +237,6 @@ function MessageBubble({ msg, onReply, onReport }: { msg: ChatMessageData; onRep
         </div>
         <button type="button" aria-label="Message options" onClick={() => setMenuOpen((v) => !v)} className="rounded p-1 text-muted-foreground hover:bg-muted"><MoreVertical className="size-4" /></button>
         {menuOpen && <div className="absolute right-0 top-full z-20 min-w-32 rounded-lg border border-border bg-card p-1 text-left shadow-lg">
-          <button className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-muted" onClick={() => { onReply(msg); setMenuOpen(false); }}><Reply className="size-3.5" />Reply</button>
           <button className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-muted" onClick={() => { void navigator.clipboard.writeText(msg.text); setMenuOpen(false); }}><Copy className="size-3.5" />Copy</button>
           {!msg.own && <button className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs text-destructive hover:bg-muted" onClick={() => { onReport(msg); setMenuOpen(false); }}><Flag className="size-3.5" />Report</button>}
         </div>}
@@ -251,8 +250,14 @@ function MessageBubble({ msg, onReply, onReport }: { msg: ChatMessageData; onRep
 
 export default function CommunityChat() {
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
+  const [typingMessage, setTypingMessage] = useState<{ id: string; username: string; avatar: string; avatarUrl?: string } | null>(null);
+  const seenMessageIds = useRef(new Set<string>());
+  const stagedMessageIds = useRef(new Set<string>());
+  const hydratedMessages = useRef(false);
   const [chatLoading, setChatLoading] = useState(true);
   const [chatError, setChatError] = useState<string | null>(null);
+  const [chatLocked, setChatLocked] = useState(false);
+  const [banNotice, setBanNotice] = useState<{ reason: string; expiresAt: string | null } | null>(null);
   const [input, setInput] = useState("");
   const [replyTo, setReplyTo] = useState<ChatMessageData | null>(null);
   const [reportTarget, setReportTarget] = useState<ChatMessageData | null>(null);
@@ -272,6 +277,9 @@ export default function CommunityChat() {
 
   const modTimer = useRef<number | undefined>(undefined);
   const scrollerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, typingMessage]);
 
   useEffect(() => () => window.clearTimeout(modTimer.current), []);
   useEffect(() => setHydrated(true), []);
@@ -288,19 +296,20 @@ export default function CommunityChat() {
     let active = true;
     const fetchData = async () => {
       try {
-        const [msgRes, rulesRes, onlineRes] = await Promise.all([
+        const [msgRes, rulesRes, onlineRes, lockRes] = await Promise.all([
           fetch("/api/chat/messages?limit=15"),
           fetch("/api/chat/rules"),
           fetch("/api/chat/online"),
+          fetch("/api/chat/admin/lock"),
         ]);
         
         if (msgRes.ok) {
           const data = await msgRes.json();
-          const formatted = data.map((m: any) => ({
+          const formatted = [...new Map(data.map((m: any) => [m.id, m])).values()].map((m: any) => ({
             id: m.id,
-            userId: m.user_id || "system",
+            userId: m.user_id || m.username || "system",
             username: m.username || `${m.first_name || "User"}_${m.last_name?.charAt(0) || "U"}`,
-            avatar: m.first_name?.charAt(0) || "U",
+            avatar: m.avatar || m.avatar_url || m.username || m.first_name?.charAt(0) || "U",
             avatarUrl: m.avatar_url || undefined,
             text: m.message,
             timestamp: new Date(m.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
@@ -313,7 +322,33 @@ export default function CommunityChat() {
             replyUsername: m.reply_to?.username,
           }));
           if (!active) return;
-          setMessages((prev) => prev.length ? [...prev.filter((m) => !formatted.some((n: ChatMessageData) => n.id === m.id)), ...formatted] : formatted);
+          if (!hydratedMessages.current) {
+            formatted.forEach((message: ChatMessageData) => seenMessageIds.current.add(message.id));
+            hydratedMessages.current = true;
+            setMessages(formatted);
+            setHasOlder(data.length === 15);
+            setChatError(null);
+            const pinned = formatted.find((m: ChatMessageData) => m.pinned);
+            setPinnedMsg(pinned || null);
+            return;
+          }
+          setMessages((prev) => {
+            const incoming = formatted.filter((m: ChatMessageData) => !seenMessageIds.current.has(m.id) && !m.own);
+            formatted.forEach((message: ChatMessageData) => seenMessageIds.current.add(message.id));
+            if (incoming.length) {
+              const message = incoming[incoming.length - 1];
+              stagedMessageIds.current.add(message.id);
+              setTypingMessage({ id: message.id, username: message.username, avatar: message.avatar, avatarUrl: message.avatarUrl });
+              window.setTimeout(() => {
+                setTypingMessage((current) => current?.id === message.id ? null : current);
+                stagedMessageIds.current.delete(message.id);
+                setMessages((prev) => prev.length ? [...prev.filter((old) => !formatted.some((row: ChatMessageData) => row.id === old.id)), ...formatted] : formatted);
+              }, 1000 + Math.floor(Math.random() * 2001));
+              requestAnimationFrame(() => scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: "smooth" }));
+              return prev.filter((old) => !stagedMessageIds.current.has(old.id));
+            }
+            return prev.length ? [...prev.filter((m) => !formatted.some((n: ChatMessageData) => n.id === m.id)), ...formatted.filter((m: ChatMessageData) => !stagedMessageIds.current.has(m.id))] : formatted.filter((m: ChatMessageData) => !stagedMessageIds.current.has(m.id));
+          });
           setHasOlder(data.length === 15 && !messages.some((m) => m.createdAt === data[0]?.created_at));
           setChatError(null);
           
@@ -334,6 +369,7 @@ export default function CommunityChat() {
             setOnlineCount(onlineBase.current);
           }
         }
+        if (lockRes.ok) { const lockData = await lockRes.json(); if (active) { setChatLocked(Boolean(lockData.locked)); setBanNotice(lockData.banned ? { reason: lockData.banReason || "Chat policy violation", expiresAt: lockData.expiresAt || null } : null); } }
       } catch (err) {
         console.error("Failed to fetch chat data:", err);
         if (active) setChatError("Unable to connect to chat. Retrying…");
@@ -358,7 +394,7 @@ export default function CommunityChat() {
       if (res.ok) {
         const rows = await res.json();
         setHasOlder(rows.length === 15);
-        const older = rows.map((m: any) => ({ id: m.id, userId: m.user_id || "system", username: m.username || "User", avatar: m.first_name?.[0] || "U", avatarUrl: m.avatar_url, text: m.message, timestamp: new Date(m.created_at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }), createdAt: m.created_at, own: Boolean(m.own), pinned: m.pinned, admin: m.is_admin, replyText: m.reply_to?.message, replyUsername: m.reply_to?.username }));
+        const older = rows.map((m: any) => ({ id: m.id, userId: m.user_id || "system", username: m.username || "User", avatar: m.avatar || m.avatar_url || m.username || m.first_name?.[0] || "U", avatarUrl: m.avatar_url, text: m.message, timestamp: new Date(m.created_at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }), createdAt: m.created_at, own: Boolean(m.own), pinned: m.pinned, admin: m.is_admin, replyText: m.reply_to?.message, replyUsername: m.reply_to?.username }));
         setMessages((prev) => [...older.filter((m: ChatMessageData) => !prev.some((p) => p.id === m.id)), ...prev]);
         requestAnimationFrame(() => { if (el) el.scrollTop += el.scrollHeight - height; });
       }
@@ -455,13 +491,15 @@ export default function CommunityChat() {
               {chatLoading ? <p className="m-auto text-sm text-muted-foreground">Loading chat…</p> : chatError && messages.length === 0 ? <p className="m-auto text-sm text-muted-foreground">{chatError}</p> : messages.length === 0 ? <p className="m-auto text-sm text-muted-foreground">No messages yet.</p> : messages.map((msg) => (
                 <MessageBubble key={msg.id} msg={msg} onReply={setReplyTo} onReport={setReportTarget} />
               ))}
+              {typingMessage && <div key={typingMessage.id} className="flex items-end gap-2 self-start" aria-label={`${typingMessage.username} is typing`}><AvatarGlyph letter={typingMessage.avatar} src={typingMessage.avatarUrl} /><div className="flex items-center gap-1 rounded-2xl bg-muted px-3 py-2.5">{[0, 1, 2].map((dot) => <span key={dot} className="size-1.5 animate-bounce rounded-full bg-muted-foreground" style={{ animationDelay: `${dot * 150}ms` }} />)}</div></div>}
             </div>
             {showLatest && <button type="button" aria-label="Jump to latest messages" onClick={() => { scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: "smooth" }); setShowLatest(false); }} className="sticky bottom-3 float-right mr-3 grid size-10 place-items-center rounded-full border border-border bg-card shadow-lg"><ChevronDown className="size-5" /></button>}
           </div>
 
           {/* ── Input ─────────────────────────────────────── */}
           <div className="shrink-0 border-t border-border p-3">
-            <div className="relative mx-auto flex max-w-3xl items-center gap-2">
+            {(chatLocked || banNotice) && <p role="status" className="mx-auto mb-2 max-w-3xl rounded-lg border border-border bg-muted px-3 py-2 text-center text-sm font-medium">{banNotice ? <>Chat access suspended. Reason: {banNotice.reason}. {banNotice.expiresAt ? `Until ${new Date(banNotice.expiresAt).toLocaleString()}.` : "No end time set."}</> : "Chat is locked by an admin."}</p>}
+            <div className={`relative mx-auto flex max-w-3xl items-center gap-2 ${chatLocked || banNotice ? "opacity-60" : ""}`}>
               {replyTo && <div className="absolute bottom-full left-0 right-0 mb-2 flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-xs"><span className="truncate">Replying to <b>{replyTo.username}</b>: {replyTo.text.slice(0, 80)}</span><button type="button" aria-label="Cancel reply" onClick={() => setReplyTo(null)}><X className="size-4" /></button></div>}
               {emojiOpen && (
                 <EmojiPicker
@@ -481,14 +519,15 @@ export default function CommunityChat() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                placeholder="Message the community… (@ to mention)"
+                placeholder={banNotice ? "You are banned from chat" : chatLocked ? "Chat is locked" : "Message the community…"}
                 className="h-10 flex-1 rounded-full"
+                disabled={chatLocked || !!banNotice}
               />
               <Button
                 size="icon"
                 className="shrink-0 rounded-full"
                 onClick={handleSend}
-                disabled={hydrated && !input.trim()}
+                disabled={chatLocked || !!banNotice || (hydrated && !input.trim())}
               >
                 <SendHorizonal />
               </Button>

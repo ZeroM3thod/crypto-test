@@ -2016,6 +2016,47 @@ create table if not exists public.community_rules (
 );
 
 -- Chat messages
+create table if not exists public.chat_scheduled_messages (
+  id uuid primary key default gen_random_uuid(),
+  username text not null,
+  message text not null,
+  scheduled_at timestamptz not null,
+  created_by uuid references public.auth_users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index if not exists chat_scheduled_messages_due_idx on public.chat_scheduled_messages (scheduled_at);
+
+create or replace function public.publish_due_chat_messages()
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare v_count int;
+begin
+  with due as (
+    delete from public.chat_scheduled_messages
+    where id in (select id from public.chat_scheduled_messages where scheduled_at <= clock_timestamp() order by scheduled_at for update skip locked limit 100)
+    returning username, message
+  ), inserted as (
+    insert into public.chat_messages (user_id, username, first_name, last_name, message, is_admin)
+    select null, username, split_part(username, ' ', 1), coalesce(nullif(split_part(username, ' ', 2), ''), 'U'), message, false from due
+    returning id
+  ) select count(*) into v_count from inserted;
+  return v_count;
+end;
+$$;
+
+do $$ begin
+  if exists (select 1 from cron.job where jobname = 'publish-due-chat-messages') then
+    perform cron.unschedule((select jobid from cron.job where jobname = 'publish-due-chat-messages'));
+  end if;
+  if not exists (select 1 from cron.job where jobname = 'publish-due-chat-messages') then
+    perform cron.schedule('publish-due-chat-messages', '1 second', 'select public.publish_due_chat_messages();');
+  end if;
+end $$;
+
+-- Chat messages
 create table if not exists public.chat_messages (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references public.auth_users(id) on delete set null,

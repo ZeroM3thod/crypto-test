@@ -16,6 +16,9 @@ function replyCompatibilityError(error: unknown) {
 }
 
 export async function GET(req: NextRequest) {
+  try {
+    await fetch(new URL("/api/chat/admin/schedule", req.url), { headers: { cookie: req.headers.get("cookie") || "" }, cache: "no-store" });
+  } catch (error) { console.error("Scheduled chat delivery failed:", error); }
   const session = await getSession(req);
   if (!session) return bad("Unauthorized", 401);
 
@@ -44,7 +47,7 @@ export async function GET(req: NextRequest) {
   const archiveFiltered = archived.filter((m) => !m.deleted && (!before || m.created_at < before));
   const messages = [...archiveFiltered, ...live]
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
-    .filter((m, index, rows) => rows.findIndex((row) => row.id === m.id) === index)
+    .filter((m, index, rows) => rows.findIndex((row) => row.id === m.id || (row.username === m.username && row.message === m.message && Math.abs(Date.parse(row.created_at) - Date.parse(m.created_at)) < 2000)) === index)
     .slice(0, limit);
 
   const replyIds = [...new Set(messages.map((m) => m.reply_to).filter(Boolean))];
@@ -66,8 +69,8 @@ export async function GET(req: NextRequest) {
     ...m,
     own: String(m.user_id) === String(session.user.id),
     username: m.username || `${m.first_name || "User"}_${m.last_name?.[0] || "U"}`,
-    avatar_url: m.is_admin ? avatarForUser(m.user_id || "admin") : avatarForUser(m.username || m.user_id || "admin"),
-    avatar: m.is_admin ? avatarForUser(m.user_id || "admin") : avatarForUser(m.username || m.user_id || "admin"),
+    avatar_url: avatarForUser(m.user_id || m.username || "admin"),
+    avatar: avatarForUser(m.user_id || m.username || "admin"),
      reply_to: replyById.get(m.reply_to) || relatedById.get(m.reply_to) || archivedById.get(m.reply_to) || (m.reply_message ? { username: m.reply_username, message: m.reply_message } : null),
   })));
 }
@@ -142,7 +145,7 @@ export async function POST(req: NextRequest) {
 
   // Insert message
   const messageRow = {
-    user_id: session.user.id,
+    user_id: personaName ? null : session.user.id,
     username: personaName || `${session.user.first_name}_${session.user.last_name?.charAt(0) || "U"}`,
     first_name: personaName ? personaName.split(/[ _]/)[0] : session.user.first_name,
     last_name: personaName ? (personaName.split(/[ _]/).slice(1).join(" ") || "U") : (session.user.last_name || "U"),

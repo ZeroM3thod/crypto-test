@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
   return Response.json(await supabase<any[]>("chat_reports?select=id,message_id,reported_by,reason,status,created_at,chat_messages(id,user_id,username,message)&status=in.(pending,seen)&order=created_at.desc"));
 }
 
-export async function PATCH(req: NextRequest) {
+async function reviewReport(req: NextRequest) {
   const session = await getSession(req);
   if (!session || !["admin", "owner"].includes(session.user.role || "")) return bad("Unauthorized", 403);
   const { reportId, action, reason } = await req.json();
@@ -28,3 +28,6 @@ export async function PATCH(req: NextRequest) {
   await supabase(`chat_reports?id=eq.${q(reportId)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: action === "ban" ? "reviewed" : "dismissed", reviewed_by: session.user.id, reviewed_at: new Date().toISOString() }) });
   return Response.json({ ok: true });
 }
+
+export const PATCH = reviewReport;
+export const POST = reviewReport;

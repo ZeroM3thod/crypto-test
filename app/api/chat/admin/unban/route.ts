@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
   if (typeof userId !== "string") return bad("User ID is required");
 
   await supabase(`chat_bans?user_id=eq.${q(userId)}&active=eq.true`, {
-    method: "POST",
+    method: "PATCH",
     headers: { Prefer: "return=minimal" },
     body: JSON.stringify({ active: false, unbanned_at: new Date().toISOString(), unbanned_by: session.user.id }),
   });

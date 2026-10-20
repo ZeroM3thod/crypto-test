@@ -1,11 +1,15 @@
 import { NextRequest } from "next/server";
 import { bad, getSession, supabase } from "@/lib/auth/backend";
+import { q } from "@/lib/auth/backend";
 
 export async function GET(req: NextRequest) {
   const session = await getSession(req);
-  if (!session || (session.user.role !== "admin" && session.user.role !== "owner")) return bad("Unauthorized", 403);
+  if (!session) return bad("Unauthorized", 401);
   const [setting] = await supabase<any[]>("chat_settings?select=value&key=eq.chat_locked&limit=1");
-  return Response.json({ locked: setting?.value === true || setting?.value === "true" });
+  const [ban] = await supabase<any[]>(`chat_bans?select=reason,banned_at,expires_at&user_id=eq.${q(session.user.id)}&active=eq.true&limit=1`);
+  const banExpiry = ban?.expires_at ? Date.parse(ban.expires_at) : null;
+  const banned = !!ban && (banExpiry === null || banExpiry > Date.now());
+  return Response.json({ locked: setting?.value === true || setting?.value === "true", banned, banReason: banned ? ban.reason : null, bannedAt: banned ? ban.banned_at : null, expiresAt: banned ? ban.expires_at : null });
 }
 
 export async function POST(req: NextRequest) {

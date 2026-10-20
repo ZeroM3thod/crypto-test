@@ -26,6 +26,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { avatarForUser } from "@/lib/auth/backend";
 import { Button } from "@/components/motion/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/motion/tabs";
 import {
@@ -73,20 +74,40 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 const isCustom = (id: string) => id.startsWith("p-");
 
 const nowHM = () => {
-  const d = new Date();
-  return `${String(d.getHours()).padStart(2, "0")}:${String(
-    d.getMinutes(),
-  ).padStart(2, "0")}`;
+  return new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Dhaka", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).format(new Date());
+};
+
+const scheduledDelay = (time: string) => {
+  const normalized = normTime(time);
+  if (!normalized) return 0;
+  const [hour, minute, second] = normalized.split(":").map(Number);
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Dhaka", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
+  const nowHour = Number(parts.find((p) => p.type === "hour")?.value);
+  const nowMinute = Number(parts.find((p) => p.type === "minute")?.value);
+  const nowSecond = Number(parts.find((p) => p.type === "second")?.value);
+  const nowSeconds = nowHour * 3600 + nowMinute * 60 + nowSecond;
+  let targetSeconds = hour * 3600 + minute * 60 + second;
+  if (targetSeconds <= nowSeconds) targetSeconds += 24 * 3600;
+  return (targetSeconds - nowSeconds) * 1000;
+};
+
+const scheduleInstant = (time: string) => {
+  const normalized = normTime(time);
+  if (!normalized) throw new Error("Invalid schedule time");
+  const [date] = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Dhaka", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()).split(",");
+  const today = new Date(`${date}T${normalized}+06:00`);
+  return new Date(today.getTime() + (today.getTime() <= Date.now() ? 86400000 : 0)).toISOString();
 };
 
 /** "9:5" is invalid, "9:05" -> "09:05". Returns "" when invalid. */
 const normTime = (t: string) => {
-  const m = t.trim().match(/^(\d{1,2}):(\d{2})$/);
+  const m = t.trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
   if (!m) return "";
   const h = Number(m[1]);
   const min = Number(m[2]);
-  if (h > 23 || min > 59) return "";
-  return `${String(h).padStart(2, "0")}:${m[2]}`;
+  const sec = Number(m[3] || 0);
+  if (h > 23 || min > 59 || sec > 59) return "";
+  return `${String(h).padStart(2, "0")}:${m[2]}:${String(sec).padStart(2, "0")}`;
 };
 
 const fmtUTC = (iso: string) =>
@@ -610,7 +631,7 @@ function ScriptDialog({
     const out: ScriptLine[] = [];
     paste.split("\n").forEach((raw) => {
       const m = raw.match(
-        /^\s*(?:\[(\d{1,2}:\d{2})\]\s*)?([^:[\]]{1,30}?)\s*:\s*(.+?)\s*$/,
+        /^\s*(?:\[(\d{1,2}:\d{2}:\d{2})\]\s*)?([^:[\]]{1,30}?)\s*:\s*(.+?)\s*$/,
       );
       if (!m) return;
       out.push({
@@ -622,7 +643,7 @@ function ScriptDialog({
       });
     });
     if (!out.length) {
-      onNotice("No lines found. Use the format: [09:14] username: message");
+      onNotice("No lines found. Use the format: [09:14:05] username: message");
       return;
     }
     setLines(out);
@@ -654,7 +675,7 @@ function ScriptDialog({
   };
 
   const PASTE_EXAMPLE =
-    "[09:14] Carlos_M: Good morning everyone!\n[09:15] Yuki_T: Morning! Did you see BTC?\n[09:15] Fatima_A: Up 4% since midnight 🚀";
+    "[09:14:05] Carlos_M: Good morning everyone!\n[09:14:10] Yuki_T: Morning! Did you see BTC?\n[09:14:15] Fatima_A: Up 4% since midnight 🚀";
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="max-w-3xl">
@@ -734,7 +755,7 @@ function ScriptDialog({
             <p className="text-xs text-muted-foreground">
               One message per line as{" "}
               <code className="rounded bg-muted px-1 py-0.5 text-foreground">
-                [HH:MM] username: message
+                [HH:MM:SS] username: message
               </code>
               . The time is optional. Unknown usernames become personas
               automatically.
@@ -782,6 +803,7 @@ function ScriptDialog({
                     <span className={LABEL_CLS}>Time</span>
                     <input
                       type="time"
+                      step="1"
                       value={l.time}
                       onChange={(e) => update(l.id, { time: e.target.value })}
                       className={`${FIELD_CLS} h-9`}
@@ -893,6 +915,11 @@ export function CommunityChatView({
   const { toast, showToast } = useToast();
 
   const [messages, setMessages] = useState(initialMessages);
+  const [typingMessage, setTypingMessage] = useState<{ id: string; username: string; avatar: string } | null>(null);
+  const seenMessageIds = useRef(new Set(initialMessages.map((message) => message.id)));
+  const stagedMessageIds = useRef(new Set<string>());
+  const hydratedMessages = useRef(false);
+  const typingTimer = useRef<number[]>([]);
   const [reports, setReports] = useState(initialReports);
   const [bans, setBans] = useState(initialBans);
   const [rules, setRules] = useState(initialRules);
@@ -907,7 +934,30 @@ export function CommunityChatView({
     const response = await fetch("/api/chat/messages");
     if (!response.ok) throw new Error("Could not refresh messages");
     const rows = await response.json();
-    setMessages(rows.map((m: any) => ({ id: m.id, userId: m.user_id || "admin", username: m.username || `${m.first_name || "Admin"}_${m.last_name?.[0] || "U"}`, avatar: m.avatar || m.first_name?.[0] || "A", text: m.message, timestamp: new Date(m.created_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }), admin: m.is_admin, pinned: m.pinned, replyText: m.reply_to?.message || m.reply_message, replyUsername: m.reply_to?.username || m.reply_username })));
+    const next = [...new Map(rows.map((m: any) => [m.id, m])).values()].map((m: any) => ({ id: m.id, userId: m.user_id || m.username || "admin", username: m.username || `${m.first_name || "Admin"}_${m.last_name?.[0] || "U"}`, avatar: m.avatar_url || m.avatar || m.username || m.first_name?.[0] || "A", text: m.message, timestamp: new Date(m.created_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }), admin: m.is_admin, pinned: m.pinned, replyText: m.reply_to?.message || m.reply_message, replyUsername: m.reply_to?.username || m.reply_username }));
+    if (!hydratedMessages.current) {
+      next.forEach((message: ChatMessage) => seenMessageIds.current.add(message.id));
+      hydratedMessages.current = true;
+      setMessages(next);
+      return;
+    }
+    const appeared = next.filter((message: ChatMessage) => !seenMessageIds.current.has(message.id) && message.userId !== "admin");
+    appeared.forEach((message: ChatMessage) => seenMessageIds.current.add(message.id));
+    if (appeared.length) {
+      typingTimer.current.forEach(window.clearTimeout);
+      typingTimer.current = [];
+      const message = appeared[appeared.length - 1];
+      stagedMessageIds.current.add(message.id);
+      setTypingMessage({ id: message.id, username: message.username, avatar: message.avatar });
+      typingTimer.current.push(window.setTimeout(() => {
+        setTypingMessage((current) => current?.id === message.id ? null : current);
+        stagedMessageIds.current.delete(message.id);
+        setMessages(next);
+      }, 1000 + Math.floor(Math.random() * 2001)));
+      setMessages(next.filter((message: ChatMessage) => !stagedMessageIds.current.has(message.id)));
+      return;
+    }
+    setMessages(next.filter((message: ChatMessage) => !stagedMessageIds.current.has(message.id)));
   };
   const refreshReports = async () => { const res = await fetch("/api/chat/admin/reports"); if (res.ok) setReports(await res.json()); };
   const reviewReport = async (reportId: string, action: "dismiss" | "ban" | "seen") => {
@@ -959,6 +1009,7 @@ export function CommunityChatView({
   const [newWord, setNewWord] = useState("");
 
   const scrollerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => () => typingTimer.current.forEach(window.clearTimeout), []);
 
   /* ---------- clock (expires timed bans automatically) ---------- */
 
@@ -1072,14 +1123,19 @@ export function CommunityChatView({
 
   useEffect(() => {
     if (scrollerRef.current) {
-      scrollerRef.current.scrollTop = scrollerRef.current.scrollHeight;
+      scrollerRef.current.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: "smooth" });
     }
-  }, [messages.length]);
+  }, [shown, typingMessage]);
 
   /* ---------- posting (local state only — no DB) ---------- */
 
-  const pushMessage = useCallback(async (p: ChatUser, text: string, _ts?: string) => {
-    await api("/api/chat/messages", { message: text, ...(p.id !== "admin" ? { persona: { username: p.username, avatar: p.avatar } } : {}) });
+  const pushMessage = useCallback(async (p: ChatUser, text: string, _ts?: string, simulated = false) => {
+    if (simulated) {
+      await api("/api/chat/admin/script", { scriptContent: `[${_ts || nowHM()}] ${p.username}: ${text}` });
+      await refreshMessages();
+      return;
+    }
+    await api("/api/chat/messages", { message: text });
     await refreshMessages();
   }, [showToast]);
 
@@ -1186,26 +1242,18 @@ export function CommunityChatView({
 
     if (mode === "now") {
       try {
-        await Promise.all(resolved.map(({ line, persona }) => pushMessage(persona, line.text.trim(), normTime(line.time))));
-        showToast(`✓ ${resolved.length} messages inserted${skipped ? ` (${skipped} skipped)` : ""}.`);
+        const response = await api("/api/chat/admin/script", { scriptContent: resolved.map(({ line, persona }) => `[${normTime(line.time) || nowHM()}] ${persona.username}: ${line.text.trim()}`).join("\n") });
+        await refreshMessages();
+        showToast(`✓ ${response.count} messages inserted${skipped ? ` (${skipped} skipped)` : ""}.`);
       } catch (e) { showToast(String(e)); return false; }
       return true;
     }
 
-    setPlaying(true);
-    let acc = 0;
-    resolved.forEach(({ line, persona }, i) => {
-      acc += Math.max(0, line.delay) * 1000;
-      const t = window.setTimeout(() => {
-      void pushMessage(persona, line.text.trim(), normTime(line.time));
-        if (i === resolved.length - 1) {
-          timers.current = [];
-          setPlaying(false);
-          showToast("✓ Script finished.");
-        }
-      }, acc);
-      timers.current.push(t);
-    });
+    try {
+      const response = await api("/api/chat/admin/schedule", { lines: resolved.map(({ line, persona }) => ({ username: persona.username, message: line.text.trim(), scheduledAt: scheduleInstant(line.time || nowHM()) })) });
+      setPlaying(false);
+      showToast(`✓ ${response.count} messages scheduled in database.`);
+    } catch (error) { showToast(String(error)); return false; }
     showToast(
       `▶ Playing ${resolved.length} messages${
         skipped ? ` (${skipped} skipped)` : ""
@@ -1816,6 +1864,14 @@ export function CommunityChatView({
                     No messages found.
                   </p>
                 )}
+                {typingMessage ? (
+                  <div key={typingMessage.id} className="flex items-end gap-2 self-start" aria-label={`${typingMessage.username} is typing`}>
+                    <div className="size-7 shrink-0"><AvatarGlyph letter={typingMessage.username} src={typingMessage.avatar.startsWith("/") ? typingMessage.avatar : avatarForUser(typingMessage.username)} /></div>
+                    <div className="flex items-center gap-1 rounded-2xl bg-muted px-3 py-2.5">
+                      {[0, 1, 2].map((dot) => <span key={dot} className="size-1.5 animate-bounce rounded-full bg-muted-foreground" style={{ animationDelay: `${dot * 150}ms` }} />)}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </div>
 

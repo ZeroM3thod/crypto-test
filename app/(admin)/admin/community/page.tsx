@@ -18,7 +18,7 @@ async function getChatData() {
       id: m.id,
       userId: m.user_id || "system",
       username: m.username || `${m.first_name || "User"}_${m.last_name?.charAt(0) || "U"}`,
-      avatar: avatarForUser(m.user_id || "admin"),
+      avatar: avatarForUser(m.user_id || m.username || "admin"),
       text: m.message,
       timestamp: new Date(m.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
       lang: "EN",
