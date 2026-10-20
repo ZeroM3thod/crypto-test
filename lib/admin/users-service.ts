@@ -52,6 +52,7 @@ export type UserDetail = {
 
 export async function getAllUsers(): Promise<UserRow[]> {
   const session = await getSessionUser();
+  if (!session || !['admin', 'owner'].includes(session.role)) throw new Error('Unauthorized');
   
   let query = db.from('auth_users').select('*');
   
@@ -61,10 +62,7 @@ export async function getAllUsers(): Promise<UserRow[]> {
   } else if (session?.role === 'admin') {
     // Admin sees only users who are not hidden
     query = query.eq('role', 'user').eq('hidden_from_admins', false);
-  } else {
-    // Fallback: only regular users
-    query = query.eq('role', 'user');
-  }
+  } else query = query.eq('role', 'user');
   
   const { data: users, error } = await query.order('created_at', { ascending: false });
 
@@ -140,7 +138,7 @@ export async function getUserDetail(userId: string): Promise<UserDetail | null> 
   }
 
   if (!user) return null;
-  if (session?.role !== 'owner' && user.hidden_from_admins) return null;
+  if (session?.role !== 'owner' && (session?.role !== 'admin' || user.role !== 'user' || user.hidden_from_admins)) return null;
 
   // Get wallets
   const { data: wallets } = await db

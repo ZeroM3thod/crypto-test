@@ -9,9 +9,9 @@ export async function visibleUserIdsFor(role?: string) {
 
 export async function canSeeUser(userId: string, role?: string) {
   if (role === "owner") return true;
-  const { data, error } = await db.from("auth_users").select("hidden_from_admins").eq("id", userId).maybeSingle();
+  const { data, error } = await db.from("auth_users").select("hidden_from_admins,role").eq("id", userId).maybeSingle();
   if (error) throw error;
-  return Boolean(data && !data.hidden_from_admins);
+  return Boolean(data && data.role === "user" && !data.hidden_from_admins);
 }
 
 export function inFilter(ids: string[]) {

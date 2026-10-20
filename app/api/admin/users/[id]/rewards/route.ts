@@ -32,6 +32,7 @@ export async function POST(
 
     const user = await getUserDetail(id);
     if (!user) return err('User not found', 404);
+    if (session.role !== 'owner' && user.role !== 'user') return err('User not found', 404);
 
     // Get admin user id
     const { data: admin } = await db

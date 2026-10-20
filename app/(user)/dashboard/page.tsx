@@ -523,19 +523,6 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* ── Returns Calendar ─────────────────────────── */}
-        <section aria-label="Daily Returns">
-          <SectionHeader title="Daily Returns" />
-          {!loading && userData && userData.dailyReturns.length > 0 ? (
-            <div className="text-xs text-muted-foreground">
-              {/* ponytail: integrate calendar view for daily/weekly returns */}
-              <p>Showing last {userData.dailyReturns.length} days of returns</p>
-            </div>
-          ) : (
-            <p className="text-xs text-muted-foreground">No return data available</p>
-          )}
-        </section>
-
         {/* ── Activity Overview ─────────────────────────── */}
         <section aria-label="Activity Overview">
           <SectionHeader title="Activity Overview" />

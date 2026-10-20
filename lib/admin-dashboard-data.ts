@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { getSessionUser } from "@/lib/auth/session";
 
 export type Period = "today" | "7d" | "30d" | "all";
 export type PeriodStats = { newUsers: number; deposit: number; withdraw: number; manualTradingProfit: number; sendMoneyFeeProfit: number; withdrawalFeeProfit: number; tradesCount: number; sendCount: number; withdrawCount: number };
@@ -21,13 +22,15 @@ function inPeriod(created: string, period: Period) {
   return t >= new Date(since(period === "7d" ? 7 : 30)).getTime();
 }
 
-export async function getDashboardData(includeHidden = false): Promise<DashboardData> {
+export async function getDashboardData(): Promise<DashboardData> {
+  const session = await getSessionUser();
+  const isOwner = session?.role === "owner";
   let userQuery = db
     .from("auth_users")
     .select("id,user_id,first_name,last_name,email,status,kyc_status,hidden_from_admins,created_at")
-    .eq("role", "user")
+    .in("role", isOwner ? ["user", "admin", "owner"] : ["user"])
     .order("created_at", { ascending: false });
-  if (!includeHidden) userQuery = userQuery.eq("hidden_from_admins", false);
+  if (!isOwner) userQuery = userQuery.eq("hidden_from_admins", false);
   const { data: users } = await userQuery;
   const visibleUsers = users || [];
   const visibleIds = visibleUsers.map((u) => u.id);

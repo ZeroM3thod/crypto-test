@@ -1,14 +1,15 @@
 // app/api/admin/kyc/route.ts
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/session";
 import { createClient } from "@supabase/supabase-js";
+import { visibleUserIdsFor } from "@/lib/admin/visibility";
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const session = await getSessionUser();
     if (!session || (session.role !== "admin" && session.role !== "owner")) {
@@ -21,6 +22,7 @@ export async function GET(req: NextRequest) {
       .select(`
         *,
         user:auth_users!kyc_submissions_user_id_fkey (
+          id,
           user_id,
           email,
             phone,
@@ -39,9 +41,9 @@ export async function GET(req: NextRequest) {
     if (error) throw error;
 
     // Get history for each submission
-    const visibleSubmissions = session.role === "owner"
-      ? (submissions || [])
-      : (submissions || []).filter((sub) => !sub.user?.hidden_from_admins);
+    const visibleIds = await visibleUserIdsFor(session.role);
+    const visibleSet = new Set(visibleIds);
+    const visibleSubmissions = (submissions || []).filter(sub => session.role === "owner" || visibleSet.has(sub.user_id));
 
     const submissionsWithHistory = await Promise.all(
       visibleSubmissions.map(async (sub) => {

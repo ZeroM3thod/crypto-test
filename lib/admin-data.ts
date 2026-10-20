@@ -1,5 +1,6 @@
 // lib/admin-data.ts
 import { db } from "@/lib/db";
+import { getSessionUser } from "@/lib/auth/session";
 import type { UserRow } from "@/lib/users-data";
 
 export type AdminRow = {
@@ -59,6 +60,7 @@ async function walletTotals(ids: string[]) {
 }
 
 export async function getAdmins(): Promise<AdminRow[]> {
+  if ((await getSessionUser())?.role !== "owner") throw new Error("Owner access required");
   const { data: admins, error } = await db
     .from("auth_users")
     .select("id,user_id,first_name,last_name,email,status,role,created_at")
@@ -86,11 +88,13 @@ export async function getAdmins(): Promise<AdminRow[]> {
 }
 
 export async function getManagedUsers(): Promise<ManagedUser[]> {
-  const { data: users, error } = await db
+  const session = await getSessionUser();
+  let query = db
     .from("auth_users")
     .select("id,user_id,first_name,last_name,email,country,status,role,kyc_status,two_fa_enabled,referral_code,hidden_from_admins,created_at")
-    .eq("role", "user")
     .order("created_at", { ascending: false });
+  query = session?.role === "owner" ? query.in("role", ["user", "admin", "owner"]) : query.eq("role", "user").eq("hidden_from_admins", false);
+  const { data: users, error } = await query;
   if (error) throw error;
 
   const totals = await walletTotals((users || []).map((u) => u.id));
@@ -114,17 +118,20 @@ export async function getAdminVisibleUsers(): Promise<ManagedUser[]> {
 }
 
 export async function setUserHidden(ids: string[], hidden: boolean): Promise<void> {
+  if ((await getSessionUser())?.role !== "owner") throw new Error("Owner access required");
   const { error } = await db.from("auth_users").update({ hidden_from_admins: hidden }).in("user_id", ids);
   if (error) throw error;
 }
 
 export async function getAdminByPublicId(id: string): Promise<{ id: string; publicId: string; status: string } | null> {
+  if ((await getSessionUser())?.role !== "owner") throw new Error("Owner access required");
   const { data, error } = await db.from("auth_users").select("id,user_id,status,role").eq("user_id", id).eq("role", "admin").maybeSingle();
   if (error) throw error;
   return data ? { id: data.id, publicId: data.user_id || data.id, status: data.status } : null;
 }
 
 export async function getAdminById(id: string): Promise<AdminRow | null> {
+  if ((await getSessionUser())?.role !== "owner") return null;
   const query = db.from("auth_users").select("id,user_id,first_name,last_name,email,status,role,created_at").eq("role", "admin");
   const { data, error } = /^[0-9a-f-]{36}$/i.test(id)
     ? await query.eq("id", id).maybeSingle()
@@ -144,6 +151,7 @@ export async function getAdminById(id: string): Promise<AdminRow | null> {
 }
 
 export async function logImpersonation(ownerId: string, adminId: string): Promise<void> {
+  if ((await getSessionUser())?.role !== "owner") throw new Error("Owner access required");
   await db.from("impersonation_log").insert({ owner_id: ownerId, admin_id: adminId }).throwOnError();
 }
 
@@ -157,6 +165,7 @@ export type BalanceChangeEntry = {
 };
 
 export async function logBalanceChange(entry: Omit<BalanceChangeEntry, "at">): Promise<void> {
+  if ((await getSessionUser())?.role !== "owner") throw new Error("Owner access required");
   await db.from("admin_actions").insert({
     admin_id: entry.adminId,
     target_user_id: entry.userId,
@@ -166,21 +175,25 @@ export async function logBalanceChange(entry: Omit<BalanceChangeEntry, "at">): P
 }
 
 export async function getRestrictedMode(): Promise<boolean> {
+  if ((await getSessionUser())?.role !== "owner") throw new Error("Owner access required");
   const { data } = await db.from("auth_settings").select("value").eq("key", "restricted_mode").maybeSingle();
   return data?.value === true || data?.value === "true";
 }
 
 export async function setRestrictedMode(enabled: boolean): Promise<void> {
+  if ((await getSessionUser())?.role !== "owner") throw new Error("Owner access required");
   await db.from("auth_settings").upsert({ key: "restricted_mode", value: enabled }).throwOnError();
 }
 
 export async function getRestrictedPeople(): Promise<RestrictedEntry[]> {
+  if ((await getSessionUser())?.role !== "owner") throw new Error("Owner access required");
   const { data, error } = await db.from("restricted_people").select("public_id,name,kind,created_at").order("created_at", { ascending: false });
   if (error) throw error;
   return (data || []).map((r: any) => ({ id: r.public_id, name: r.name, kind: r.kind, addedAt: day(r.created_at) }));
 }
 
 export async function addRestrictedPeople(ids: string[]): Promise<{ added: RestrictedEntry[]; missing: string[] }> {
+  if ((await getSessionUser())?.role !== "owner") throw new Error("Owner access required");
   const clean = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
   if (!clean.length) return { added: [], missing: [] };
   const { data: users, error } = await db.from("auth_users").select("id,user_id,first_name,last_name,email,role").in("user_id", clean).in("role", ["user", "admin"]);
@@ -195,5 +208,6 @@ export async function addRestrictedPeople(ids: string[]): Promise<{ added: Restr
 }
 
 export async function removeRestrictedPerson(id: string): Promise<void> {
+  if ((await getSessionUser())?.role !== "owner") throw new Error("Owner access required");
   await db.from("restricted_people").delete().eq("public_id", id).throwOnError();
 }

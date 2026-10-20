@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Money Received Dialog</title>
+<script src="./vendor/react.js"></script>
+<script src="./vendor/react-dom.js"></script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+button{font-family:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 720px; height: 960px; box-sizing: border-box; background: #141414; display: flex; align-items: center; justify-content: center; font-family: 'Manrope', 'Helvetica Neue', Arial, sans-serif; color: #ffffff">
+<div role="dialog" aria-label="Money received" style="width: 440px; box-sizing: border-box; background: #2a2a2a; border: 1px solid #3a3a3a; border-radius: 24px; padding: 28px; display: flex; flex-direction: column; gap: 24px; box-shadow: 0 24px 64px rgba(0,0,0,0.5)">
+
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 16px">
+<div style="display: flex; align-items: center; gap: 12px">
+<div style="width: 44px; height: 44px; border-radius: 14px; background: rgba(34,197,94,0.14); display: flex; align-items: center; justify-content: center">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 7 7 17M17 17H7V7"></path></svg>
+</div>
+<span style="font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #22c55e">Money received</span>
+</div>
+<button aria-label="Close" style="width: 44px; height: 44px; border-radius: 12px; border: 1px solid #3f3f3f; background: transparent; display: flex; align-items: center; justify-content: center">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d4d4d4" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+</button>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-start">
+<span style="font-size: 13px; font-weight: 600; color: #a3a3a3">Amount received</span>
+<span style="font-size: 52px; line-height: 1.05; font-weight: 800; letter-spacing: -0.02em; color: #ffffff">+$150.00</span>
+</div>
+
+<div style="display: flex; align-items: center; gap: 14px">
+<div style="width: 48px; height: 48px; border-radius: 999px; background: #22c55e; color: #08140c; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 800">SA</div>
+<div style="display: flex; flex-direction: column; gap: 2px">
+<span style="font-size: 17px; font-weight: 700; color: #ffffff">Sabbir Ahmed</span>
+<span style="font-size: 14px; font-weight: 500; color: #a3a3a3">sent you money</span>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 14px; background: #232323; border-radius: 14px; padding: 18px 16px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 16px"><span style="font-size: 14px; font-weight: 600; color: #a3a3a3">Name</span><span style="font-size: 14px; font-weight: 700; color: #ffffff">Sabbir Ahmed</span></div>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 16px"><span style="font-size: 14px; font-weight: 600; color: #a3a3a3">Gmail</span><span style="font-size: 14px; font-weight: 700; color: #ffffff">sabbir.ahmed@gmail.com</span></div>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 16px"><span style="font-size: 14px; font-weight: 600; color: #a3a3a3">User ID</span><span style="font-size: 14px; font-weight: 700; color: #ffffff">UID-482915</span></div>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 16px"><span style="font-size: 14px; font-weight: 600; color: #a3a3a3">Transaction ID</span><span style="font-size: 14px; font-weight: 700; color: #ffffff">TXN-7F3A9C21B8</span></div>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 16px"><span style="font-size: 14px; font-weight: 600; color: #a3a3a3">Date &amp; time</span><span style="font-size: 14px; font-weight: 700; color: #ffffff">15 Oct 2026, 09:42 AM</span></div>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 16px"><span style="font-size: 14px; font-weight: 600; color: #a3a3a3">Credited to</span><span style="font-size: 14px; font-weight: 700; color: #ffffff">Main wallet</span></div>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 16px"><span style="font-size: 14px; font-weight: 600; color: #a3a3a3">Status</span>
+<span style="display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px; border-radius: 999px; background: rgba(34,197,94,0.14); color: #22c55e; font-size: 13px; font-weight: 700">
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Completed</span></div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 13px; font-weight: 600; color: #a3a3a3">Note from sender</span>
+<p style="margin: 0; font-size: 15px; line-height: 1.55; font-weight: 500; color: #e5e5e5; border: 1.5px solid #3f3f3f; border-radius: 12px; padding: 14px 16px">Thanks for the help with the project. Here is your share!</p>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px">
+<button style="height: 52px; border-radius: 14px; border: none; background: #22c55e; color: #08140c; font-size: 16px; font-weight: 800">Got it</button>
+<button style="height: 48px; border-radius: 14px; border: 1.5px solid #3f3f3f; background: transparent; color: #ffffff; font-size: 15px; font-weight: 600">View transaction</button>
+</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":720,"height":960}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>
