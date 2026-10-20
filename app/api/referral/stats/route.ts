@@ -58,6 +58,8 @@ export async function GET(req: NextRequest) {
   const milestones = await supabase<{ id: string; required_active: number; reward: number }[]>(
     `referral_milestones?select=id,required_active,reward&active=eq.true&order=required_active.asc`
   );
+  const rateRows = await supabase<{value:Record<string,number>}[]>("auth_settings?select=value&key=eq.referral_commission_rates&limit=1").catch(() => []);
+  const commissionRates = {daily:5,aiTrading:5,...(rateRows[0]?.value || {})};
 
   // Get user's referral code (from auth_users.referral_code or generate from user_id)
   const referralCode = user.user_id || user.id.slice(0, 6).toUpperCase();
@@ -74,6 +76,7 @@ export async function GET(req: NextRequest) {
         aiTrading: Number(stats.commission_by_source?.ai_trading || 0),
       },
     },
+    commissionRates,
     referredUsers,
     milestones: milestones.map((m) => ({
       id: m.id,

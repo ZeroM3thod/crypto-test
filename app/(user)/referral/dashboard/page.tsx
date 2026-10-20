@@ -59,6 +59,7 @@ interface ReferralData {
       aiTrading: number;
     };
   };
+  commissionRates: { daily: number; aiTrading: number };
   referredUsers: ReferredUser[];
   milestones: MilestoneTier[];
 }
@@ -70,14 +71,14 @@ const SOURCE_META: Record<
   daily: {
     label: "Daily Profit",
     icon: TrendingUp,
-    basis: "5% of profit · lifetime",
+    basis: "%RATE% of profit · lifetime",
     barClass: "bg-foreground",
     dotClass: "bg-foreground",
   },
   aiTrading: {
     label: "AI Trading",
     icon: Bot,
-    basis: "5% of profit · lifetime",
+    basis: "%RATE% of profit · lifetime",
     barClass: "bg-foreground/40",
     dotClass: "bg-foreground/40",
   },
@@ -341,7 +342,7 @@ export default function ReferralDashboardPage() {
 
   const sources = (Object.keys(SOURCE_META) as ProfitSource[]).map((key) => {
     const amount = key === "daily" ? data.stats.commissionBySource.daily : data.stats.commissionBySource.aiTrading;
-    return { key, amount, meta: SOURCE_META[key] };
+    return { key, amount, meta: { ...SOURCE_META[key], basis: `${data.commissionRates?.[key] ?? 5}% of profit · lifetime` } };
   });
   const sourceTotal = sources.reduce((sum, s) => sum + s.amount, 0);
 
@@ -383,7 +384,7 @@ export default function ReferralDashboardPage() {
                 <div className="min-w-0">
                   <h2 className="text-base font-semibold text-foreground sm:text-lg">Invite &amp; Earn</h2>
                   <p className="text-xs text-muted-foreground sm:text-sm">
-                    Share your link or code and earn 5% of your referrals' profit, for life.
+                    Share your link or code and earn the configured percentage of your referrals' profit, for life.
                   </p>
                 </div>
               </div>
@@ -437,7 +438,7 @@ export default function ReferralDashboardPage() {
                       </p>
                     </div>
                     <span className="shrink-0 rounded-full border border-border bg-muted/30 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-foreground">
-                      5% · Lifetime
+                      {Math.max(data.commissionRates?.daily ?? 5, data.commissionRates?.aiTrading ?? 5)}% · Lifetime
                     </span>
                   </div>
 
@@ -704,10 +705,10 @@ export default function ReferralDashboardPage() {
                 <CardHeader>
                   <CardTitle as="h2" className="flex items-center gap-2 text-lg">
                     <DollarSign className="size-4 text-foreground" />
-                    Lifetime Commission (5%)
+                    Lifetime Commission
                   </CardTitle>
                   <CardDescription>
-                    You earn 5% of every referred user's earnings, for life, tracked separately per source.
+                    Commission percentages are set by the administrator, applied to eligible referral profits, and tracked per source.
                   </CardDescription>
                 </CardHeader>
 
@@ -884,7 +885,7 @@ export default function ReferralDashboardPage() {
                     <span className="text-sm font-medium text-foreground">${money(modalUser.totalDeposited)}</span>
                   </div>
                   <div className="flex items-center justify-between gap-3 pt-2">
-                    <span className="text-xs text-muted-foreground">Commission Earned (5%)</span>
+                    <span className="text-xs text-muted-foreground">Commission Earned</span>
                     <span className="text-sm font-semibold text-foreground">${money(modalUser.commissionEarned)}</span>
                   </div>
                 </div>

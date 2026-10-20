@@ -410,6 +410,7 @@ as $$
 declare
   v_referrer_id uuid;
   v_commission_amount numeric;
+  v_commission_rate numeric;
 begin
   -- Record profit event
   insert into public.profit_events (user_id, source, profit_amount)
@@ -421,12 +422,16 @@ begin
   where r.referred_id = p_user_id and r.is_eligible = true
   limit 1;
 
+  select coalesce((select (value ->> case p_source when 'daily_profit' then 'daily' when 'ai_trading' then 'aiTrading' else 'daily' end)::numeric / 100
+    from public.auth_settings where key = 'referral_commission_rates'), 0.05)
+  into v_commission_rate;
+
   -- Create commission if referrer exists
   if v_referrer_id is not null then
-    v_commission_amount := p_profit_amount * 0.05;
+    v_commission_amount := p_profit_amount * v_commission_rate;
     
     insert into public.referral_commissions (referrer_id, referred_id, source, basis_amount, commission_rate, commission_amount)
-    values (v_referrer_id, p_user_id, p_source, p_profit_amount, 0.05, v_commission_amount);
+    values (v_referrer_id, p_user_id, p_source, p_profit_amount, v_commission_rate, v_commission_amount);
 
     -- Add commission to referrer's main wallet
     update public.wallet_accounts
@@ -526,6 +531,10 @@ create table if not exists public.daily_profit_investments (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+insert into public.auth_settings (key, value) values
+  ('referral_commission_rates', '{"daily":5,"aiTrading":5}'::jsonb)
+on conflict (key) do nothing;
 
 alter table public.daily_profit_plans add column if not exists cancel_policy_seconds int not null default 86400;
 alter table public.daily_profit_investments add column if not exists profit_interval_seconds int not null default 86400;
@@ -1237,6 +1246,31 @@ begin
   perform public.log_admin_action(p_admin_id, null, 'set_manual_daily_roi', jsonb_build_object('strategy_id', p_strategy_id, 'date', p_date, 'roi_pct', p_roi_pct));
 end;
 $$;
+
+create or replace function public.set_referral_eligible_on_deposit()
+returns trigger language plpgsql security definer set search_path=public as $$
+begin
+  if new.status='approved' and (tg_op='INSERT' or old.status is distinct from 'approved') then
+    perform public.mark_referral_eligible(new.user_id);
+  end if;
+  return new;
+end; $$;
+drop trigger if exists deposits_mark_referral_eligible on public.deposits;
+create trigger deposits_mark_referral_eligible after insert or update of status on public.deposits
+for each row execute function public.set_referral_eligible_on_deposit();
+
+create or replace function public.credit_referral_milestone(p_user_id uuid, p_milestone_id uuid, p_count int)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_reward numeric;
+begin
+  select reward into v_reward from public.referral_milestones where id=p_milestone_id and active=true;
+  if v_reward is null then raise exception 'Milestone unavailable'; end if;
+  insert into public.referral_milestone_claims(user_id,milestone_id,eligible_count_at_claim,reward_amount)
+  values(p_user_id,p_milestone_id,p_count,v_reward);
+  update public.wallet_accounts set balance=balance+v_reward,updated_at=now() where user_id=p_user_id and wallet='main';
+  insert into public.wallet_transactions(user_id,wallet,type,amount,status,tx_hash)
+  values(p_user_id,'main','referral_milestone',v_reward,'completed',gen_random_uuid()::text);
+end; $$;
 
 create or replace function public.set_manual_daily_roi_at(
   p_strategy_id text,

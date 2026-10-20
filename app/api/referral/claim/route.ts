@@ -50,29 +50,7 @@ export async function POST(req: NextRequest) {
     }),
   });
 
-  // Add reward to user's main wallet
-  await supabase(`wallet_accounts?user_id=eq.${q(user.id)}&wallet=eq.main`, {
-    method: "PATCH",
-    headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({
-      balance: `balance + ${milestone.reward}`,
-      updated_at: new Date().toISOString(),
-    }),
-  });
-
-  // Record transaction
-  await supabase("wallet_transactions", {
-    method: "POST",
-    headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({
-      user_id: user.id,
-      wallet: "main",
-      type: "referral_milestone",
-      amount: milestone.reward,
-      status: "completed",
-      tx_hash: `milestone_${milestoneId}_${Date.now()}`,
-    }),
-  });
+  await supabase("rpc/credit_referral_milestone", { method:"POST", body:JSON.stringify({p_user_id:user.id,p_milestone_id:milestoneId,p_count:eligibleCount}) });
 
   return Response.json({
     success: true,

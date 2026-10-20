@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Trophy,
   DollarSign,
@@ -10,15 +10,13 @@ import {
   Check,
   Save,
   Bot,
-  Cloud,
   TrendingUp,
-  Wallet,
 } from "lucide-react";
 
 /* ───────── Types ───────── */
 
 type TabId = "milestones" | "commission" | "top";
-type ProfitSource = "daily" | "aiTrading" | "cloudMining" | "manualTrading";
+type ProfitSource = "daily" | "aiTrading";
 
 interface MilestoneDraft {
   id: number;
@@ -26,44 +24,15 @@ interface MilestoneDraft {
   reward: string;
 }
 
-/* ───────── Placeholder data (wire to API) ───────── */
-
-const INITIAL_MILESTONES = [
-  { requiredActive: 5, reward: 5 },
-  { requiredActive: 10, reward: 12 },
-  { requiredActive: 15, reward: 35 },
-  { requiredActive: 20, reward: 30 },
-  { requiredActive: 30, reward: 40 },
-  { requiredActive: 50, reward: 75 },
-  { requiredActive: 100, reward: 170 },
-  { requiredActive: 150, reward: 250 },
-];
-
 const SOURCE_META: Record<
   ProfitSource,
   { label: string; icon: typeof TrendingUp; basis: string }
 > = {
   daily: { label: "Daily Profit", icon: TrendingUp, basis: "% of profit · lifetime" },
   aiTrading: { label: "AI Trading", icon: Bot, basis: "% of profit · lifetime" },
-  cloudMining: { label: "Cloud Mining", icon: Cloud, basis: "% of profit · lifetime" },
-  manualTrading: { label: "Manual Trading", icon: Wallet, basis: "% of total turnover · lifetime" },
 };
 
-const INITIAL_RATES: Record<ProfitSource, string> = {
-  daily: "5",
-  aiTrading: "5",
-  cloudMining: "5",
-  manualTrading: "5",
-};
-
-const TOP_REFERRERS = [
-  { userId: "USR90011", name: "Rahim Uddin", email: "rahim@mail.com", totalReferred: 260, active: 214, commission: 4820.5 },
-  { userId: "USR90022", name: "Fatima Islam", email: "fatima@mail.com", totalReferred: 221, active: 187, commission: 3914.2 },
-  { userId: "USR90033", name: "Arjun Patel", email: "arjun@mail.com", totalReferred: 190, active: 165, commission: 3120.75 },
-  { userId: "USR90044", name: "Ling Wei", email: "ling@mail.com", totalReferred: 170, active: 142, commission: 2650.0 },
-  { userId: "USR90055", name: "Carlos Mendez", email: "carlos@mail.com", totalReferred: 150, active: 129, commission: 2210.4 },
-  { userId: "USR90066", name: "Aisha Rahman", email: "aisha@mail.com", totalReferred: 140, active: 118, commission: 1985.9 },
-];
+const EMPTY_RATES: Record<ProfitSource, string> = { daily: "0", aiTrading: "0" };
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "milestones", label: "Milestones" },
@@ -87,19 +56,19 @@ export function ReferralBasicManagement() {
   const [toast, setToast] = useState({ msg: "", show: false });
 
   // Milestones
-  const [nextId, setNextId] = useState(INITIAL_MILESTONES.length + 1);
-  const [milestones, setMilestones] = useState<MilestoneDraft[]>(
-    INITIAL_MILESTONES.map((m, i) => ({
-      id: i + 1,
-      requiredActive: String(m.requiredActive),
-      reward: String(m.reward),
-    }))
-  );
+  const [nextId, setNextId] = useState(1);
+  const [milestones, setMilestones] = useState<MilestoneDraft[]>([]);
   const [milestoneError, setMilestoneError] = useState("");
 
   // Commission
-  const [rates, setRates] = useState<Record<ProfitSource, string>>(INITIAL_RATES);
+  const [rates, setRates] = useState<Record<ProfitSource, string>>(EMPTY_RATES);
   const [rateError, setRateError] = useState("");
+  const [top, setTop] = useState<{userId:string;name:string;email:string;totalReferred:number;active:number;commission:number}[]>([]);
+
+  useEffect(() => { fetch("/api/admin/referral").then(async r => { if (!r.ok) throw new Error(); return r.json(); }).then(d => {
+    setMilestones(d.milestones.map((m: {id:string;required_active:number;reward:number}) => ({id:Number(m.id.slice(0,8).replace(/\\D/g,"")) || Math.random(),requiredActive:String(m.required_active),reward:String(m.reward)})));
+    setNextId(d.milestones.length + 1); setRates(Object.fromEntries(Object.entries(d.rates).map(([k,v]) => [k,String(v)])) as Record<ProfitSource,string>); setTop(d.top);
+  }).catch(() => showToast("Could not load referral settings")); }, []);
 
   const showToast = (msg: string) => {
     setToast({ msg, show: true });
@@ -117,7 +86,7 @@ export function ReferralBasicManagement() {
 
   const removeMilestone = (id: number) => setMilestones((list) => list.filter((m) => m.id !== id));
 
-  const saveMilestones = () => {
+  const saveMilestones = async () => {
     const parsed = milestones.map((m) => ({
       requiredActive: Number(m.requiredActive),
       reward: Number(m.reward),
@@ -140,12 +109,12 @@ export function ReferralBasicManagement() {
     );
     setNextId(sorted.length + 1);
 
-    // TODO: await fetch("/api/admin/referral/milestones", { method: "PUT", body: JSON.stringify(sorted) })
-    showToast("Milestones saved");
+    const res = await fetch("/api/admin/referral", { method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify({milestones:sorted}) });
+    showToast(res.ok ? "Milestones saved" : "Could not save milestones");
   };
 
   /* ---- Commission actions ---- */
-  const saveRates = () => {
+  const saveRates = async () => {
     const invalid = (Object.keys(rates) as ProfitSource[]).some((k) => {
       const n = Number(rates[k]);
       return rates[k].trim() === "" || Number.isNaN(n) || n < 0 || n > 100;
@@ -153,8 +122,8 @@ export function ReferralBasicManagement() {
     if (invalid) return setRateError("Each rate must be a number between 0 and 100.");
 
     setRateError("");
-    // TODO: await fetch("/api/admin/referral/commission", { method: "PUT", body: JSON.stringify(rates) })
-    showToast("Commission rates saved");
+    const res = await fetch("/api/admin/referral", { method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify({rates:Object.fromEntries(Object.entries(rates).map(([k,v])=>[k,Number(v)]))}) });
+    showToast(res.ok ? "Commission rates saved" : "Could not save rates");
   };
 
   return (
@@ -282,7 +251,7 @@ export function ReferralBasicManagement() {
               <h2 className="text-lg font-semibold text-foreground">Lifetime Commission</h2>
             </div>
             <p className="mb-5 text-sm text-muted-foreground">
-              Set the lifetime commission percentage for each source. Manual Trading is calculated on total turnover.
+              Set lifetime commission percentages for daily profit and AI trading.
             </p>
 
             <div className="flex flex-col gap-2.5">
@@ -339,7 +308,7 @@ export function ReferralBasicManagement() {
             <p className="mb-5 text-sm text-muted-foreground">Users ranked by active referrals.</p>
 
             <div className="flex flex-col gap-2">
-              {[...TOP_REFERRERS]
+              {[...top]
                 .sort((a, b) => b.active - a.active)
                 .map((u, i) => (
                   <div

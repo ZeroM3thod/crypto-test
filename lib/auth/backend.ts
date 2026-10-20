@@ -23,6 +23,7 @@ type DbUser = {
   dob_year?: string | null;
   created_at?: string;
   wallet_address?: string | null;
+  referral_code?: string | null;
   kyc_status?: string | null;
   two_fa_enabled?: boolean | null;
   two_fa_secret?: string | null;

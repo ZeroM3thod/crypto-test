@@ -7,6 +7,8 @@ import {
   generateUserId,
   normalizeEmail,
   updateUser,
+  supabase,
+  q,
   verifyOtp,
 } from "@/lib/auth/backend";
 
@@ -28,6 +30,11 @@ export async function POST(req: NextRequest) {
         status: "active",
         verified_at: new Date().toISOString(),
       });
+      const refCode = String(user.referral_code || "").trim();
+      if (refCode) {
+        const owners = await supabase<{id:string}[]>(`auth_users?select=id&or=(user_id.eq.${q(refCode)},referral_code.eq.${q(refCode)})&status=eq.active&limit=1`);
+        if (owners[0] && owners[0].id !== user.id) await supabase("referrals?on_conflict=referred_id", {method:"POST",headers:{Prefer:"resolution=ignore-duplicates,return=minimal"},body:JSON.stringify({referrer_id:owners[0].id,referred_id:user.id})});
+      }
       return createSession(active, false);
     }
     return NextResponse.json({ ok: true });
