@@ -77,6 +77,7 @@ create table if not exists public.send_transactions (
   note text,
   tx_hash text not null unique,
   status text not null default 'completed' check (status in ('completed', 'pending', 'failed')),
+  receipt_seen boolean not null default false,
   created_at timestamptz not null default now()
 );
 
@@ -531,6 +532,8 @@ create table if not exists public.daily_profit_investments (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.send_transactions add column if not exists receipt_seen boolean not null default false;
 
 insert into public.auth_settings (key, value) values
   ('referral_commission_rates', '{"daily":5,"aiTrading":5}'::jsonb)

@@ -107,6 +107,7 @@ export async function POST(req: NextRequest) {
       amount,
       fee: SEND_FEE,
       total,
+      receipt_seen: false,
       note: note || null,
       tx_hash: txId,
       status: "completed",

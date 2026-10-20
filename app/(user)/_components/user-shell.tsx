@@ -181,6 +181,8 @@ export function UserShell({ active: initialActive, children }: UserShellProps) {
   });
 
   const [userProfile, setUserProfile] = useState<{ firstName: string; lastName: string; email: string; avatarUrl: string } | null>(null);
+  const [receipt, setReceipt] = useState<{ id: string; amount: number; fee: number; total: number; note: string | null; date: string; sender: string; email: string } | null>(null);
+  const [receiptQueue, setReceiptQueue] = useState<typeof receipt[]>([]);
 
   useEffect(() => {
     fetch("/api/profile")
@@ -197,6 +199,33 @@ export function UserShell({ active: initialActive, children }: UserShellProps) {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    const checkReceipts = () => fetch("/api/fund/received").then((res) => res.ok ? res.json() : null).then((data) => {
+      if (!active || !data?.receipts?.length) return;
+      const known = new Set([receipt?.id, ...receiptQueue.map((item) => item?.id), ...JSON.parse(sessionStorage.getItem("seen-receipt-dialogs") || "[]")]);
+      const fresh = data.receipts.filter((item: NonNullable<typeof receipt>) => !known.has(item.id));
+      if (!fresh.length) return;
+      setReceiptQueue((queue) => [...queue, ...fresh]);
+      if (!receipt) setReceipt(fresh[0]);
+    }).catch(() => {});
+    checkReceipts();
+    const timer = window.setInterval(checkReceipts, 2000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [receipt, receiptQueue]);
+
+  const dismissReceipt = async () => {
+    if (!receipt) return;
+    const dismissedId = receipt.id;
+    sessionStorage.setItem("seen-receipt-dialogs", JSON.stringify([...JSON.parse(sessionStorage.getItem("seen-receipt-dialogs") || "[]"), dismissedId]));
+    const remaining = receiptQueue.slice(1);
+    setReceiptQueue(remaining);
+    setReceipt(remaining[0] || null);
+    try {
+      await fetch("/api/fund/received", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: [dismissedId] }) });
+    } catch {}
+  };
 
   /** Locked items open a "Coming soon" toast instead of navigating. */
   const showComingSoon = (label: string) => {
@@ -435,6 +464,18 @@ export function UserShell({ active: initialActive, children }: UserShellProps) {
         maxVisible={1}
         icons={{ info: <Lock className="h-3.5 w-3.5" /> }}
       />
+      {receipt && <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-foreground/40 p-4" role="dialog" aria-modal="true" aria-labelledby="received-title">
+        <div className="w-full max-w-md rounded-3xl border border-border bg-card p-6 text-foreground shadow-xl">
+          <h2 id="received-title" className="text-xl font-semibold">Money received</h2>
+          <p className="mt-2 text-3xl font-bold">+${receipt.amount.toFixed(2)}</p>
+          <div className="mt-4 space-y-2 text-sm">
+            <p>From: {receipt.sender} ({receipt.email})</p><p>Date: {new Date(receipt.date).toLocaleString()}</p>
+            <p>Transaction ID: {receipt.id}</p><p>Fee: ${receipt.fee.toFixed(2)} · Total: ${receipt.total.toFixed(2)}</p>
+            <p>Status: Completed</p>{receipt.note && <p>Note: {receipt.note}</p>}
+          </div>
+          <button onClick={dismissReceipt} className="mt-6 w-full rounded-xl bg-foreground py-3 font-semibold text-background">{receiptQueue.length > 1 ? "Next" : "Close"}</button>
+        </div>
+      </div>}
     </AnimatedSidebarProvider>
   );
 }

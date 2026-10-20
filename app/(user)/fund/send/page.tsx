@@ -233,7 +233,8 @@ export default function SendPage() {
 
       setHistory((prev) => [newEntry, ...prev]);
       setCompletedTxn({ ...newEntry, senderPaid: total });
-      setAvailableBalance((prev) => prev - total);
+      const refreshed = await fetch("/api/fund/send-history").then((response) => response.ok ? response.json() : null).catch(() => null);
+      setAvailableBalance(refreshed?.balance ?? (availableBalance - total));
       setStep(3);
     } catch (err: any) {
       showToast(`Error: ${err.message || "Transfer failed"}`);
