@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, Btn, Card, Field } from "./ui";
 import { cn } from "@/lib/utils";
+import { Dialog } from "./detail-ui";
 
 const TABS = [
   "Profile",
@@ -55,7 +56,7 @@ const usd = (n: number) =>
 
 export function UserDetail({ 
   initialUser, 
-  adminRole 
+  adminRole: _adminRole 
 }: { 
   initialUser: UserDetail;
   adminRole: string;
@@ -65,8 +66,6 @@ export function UserDetail({
   const [tab, setTab] = useState<Tab>("Profile");
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
-
-  const isOwner = adminRole === 'owner';
 
   const flash = (message: string) => {
     setNote(message);
@@ -136,27 +135,6 @@ export function UserDetail({
       flash("2FA disabled");
     } catch {
       flash("Failed to disable 2FA");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const loginAsUser = async () => {
-    if (!confirm(`Login as ${user.firstName} ${user.lastName}?`)) return;
-    
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/admin/users/${user.userId}/login-as`, {
-        method: "POST",
-      });
-      if (!res.ok) throw new Error(String(res.status));
-      const { token } = await res.json();
-      
-      // Set session token and redirect to user dashboard (bypasses password/2FA)
-      document.cookie = `session_token=${token}; path=/; max-age=2592000`;
-      window.location.href = '/dashboard'; // ponytail: user lands on their own dashboard, not owner's
-    } catch (err: any) {
-      flash(err.message || "Login as user failed");
     } finally {
       setBusy(false);
     }
@@ -291,9 +269,7 @@ export function UserDetail({
       {tab === "Security & Logins" && (
         <SecurityTab 
           user={user} 
-          isOwner={isOwner} 
-          disable2FA={disable2FA} 
-          loginAsUser={loginAsUser}
+          disable2FA={disable2FA}
           busy={busy}
         />
       )}
@@ -580,6 +556,7 @@ function RewardsTab({
     type: 'non_withdrawable' as 'withdrawable' | 'non_withdrawable'
   });
   const [busy, setBusy] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const sendReward = async () => {
     const amount = Number(rewardForm.amount);
@@ -595,14 +572,17 @@ function RewardsTab({
       const res = await fetch(`/api/admin/users/${user.userId}/rewards`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(rewardForm)
+        body: JSON.stringify({ ...rewardForm, amount })
       });
-      if (!res.ok) throw new Error(String(res.status));
-      
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || `Reward request failed (${res.status})`);
+      }
       const { reward } = await res.json();
+      if (!reward?.id) throw new Error('Reward response missing');
       setUser(prev => ({
         ...prev,
-        rewards: [reward, ...prev.rewards],
+        rewards: [{ ...reward, reward_type: reward.reward_type, created_at: reward.created_at }, ...prev.rewards],
         wallets: {
           ...prev.wallets,
           [rewardForm.wallet]: {
@@ -618,15 +598,16 @@ function RewardsTab({
         wallet: 'main',
         type: 'non_withdrawable'
       });
+      setDialogOpen(false);
       flash('Reward sent');
-    } catch {
-      flash('Failed to send reward');
+    } catch (error) {
+      flash(error instanceof Error ? error.message : 'Failed to send reward');
     } finally {
       setBusy(false);
     }
   };
 
-  const totalRewarded = user.rewards.reduce((sum, r) => sum + (r.amount || 0), 0);
+  const totalRewarded = user.rewards.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
   const withdrawable = user.rewards.filter(r => r.reward_type === 'withdrawable').reduce((sum, r) => sum + (r.amount || 0), 0);
   const nonWithdrawable = totalRewarded - withdrawable;
 
@@ -651,7 +632,11 @@ function RewardsTab({
         </div>
       </div>
 
-      <Card title="Send Reward">
+      <div className="flex justify-end"><Btn tone="primary" onClick={() => setDialogOpen(true)}>Receive reward</Btn></div>
+      <Dialog open={dialogOpen} onClose={() => !busy && setDialogOpen(false)} maxWidth="max-w-lg">
+      <div className="p-5">
+      <div className="mb-4 flex items-center justify-between"><div><h2 className="text-lg font-semibold">Receive Reward</h2><p className="text-sm text-muted-foreground">Send a reward to {user.firstName} {user.lastName}</p></div><button type="button" onClick={() => setDialogOpen(false)} disabled={busy} aria-label="Close reward dialog" className="rounded-md px-2 py-1 text-muted-foreground hover:bg-muted">×</button></div>
+      <Card>
         <div className="grid gap-4 md:grid-cols-2">
           <Field
             label="Reward Title"
@@ -707,6 +692,8 @@ function RewardsTab({
           </Btn>
         </div>
       </Card>
+      </div>
+      </Dialog>
 
       <Card title={`Reward History (${user.rewards.length})`}>
         {user.rewards.length === 0 ? (
@@ -749,16 +736,12 @@ function RewardsTab({
 }
 
 function SecurityTab({ 
-  user, 
-  isOwner, 
-  disable2FA, 
-  loginAsUser,
+  user,
+  disable2FA,
   busy
 }: { 
   user: UserDetail;
-  isOwner: boolean;
   disable2FA: () => void;
-  loginAsUser: () => void;
   busy: boolean;
 }) {
   return (
@@ -778,21 +761,6 @@ function SecurityTab({
           )}
         </div>
       </Card>
-
-      {isOwner && (
-        <Card title="Owner Actions">
-          <div className="flex flex-col gap-3">
-            <p className="text-sm text-muted-foreground">
-              As an owner, you can login as this user without password or 2FA verification.
-            </p>
-            <div className="flex justify-end">
-              <Btn tone="primary" onClick={loginAsUser} disabled={busy || user.status === 'suspended'}>
-                {busy ? 'Logging in...' : 'Login as this user'}
-              </Btn>
-            </div>
-          </div>
-        </Card>
-      )}
 
       <Card title={`Login History (${user.loginHistory.length})`}>
         {user.loginHistory.length === 0 ? (

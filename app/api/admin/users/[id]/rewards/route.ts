@@ -70,9 +70,9 @@ export async function POST(
         description: reward.description,
         amount: reward.amount,
         wallet: reward.wallet,
-        type: reward.reward_type,
-        sentAt: reward.created_at,
-        sentBy: session.id,
+        reward_type: reward.reward_type,
+        created_at: reward.created_at,
+        sent_by: session.id,
         status: 'credited'
       }
     });
