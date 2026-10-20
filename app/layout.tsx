@@ -15,11 +15,19 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Crypto Invest",
-  description: "Crypto investment and trading platform with AI trading, daily profit plans, and multi-wallet management.",
+  title: "Qouantex",
+  description: "Qouantex crypto wealth and trading ecosystem.",
+  icons: {
+    icon: [
+      { url: "/icon/bright.png", media: "(prefers-color-scheme: light)" },
+      { url: "/icon/dark.png", media: "(prefers-color-scheme: dark)" },
+    ],
+    shortcut: "/icon/dark.png",
+    apple: "/icon/dark.png",
+  },
   openGraph: {
-    title: "Crypto Invest",
-    description: "Crypto investment and trading platform with AI trading, daily profit plans, and multi-wallet management.",
+    title: "Qouantex",
+    description: "Qouantex crypto wealth and trading ecosystem.",
   },
 };
 

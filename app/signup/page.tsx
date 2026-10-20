@@ -48,6 +48,7 @@ function SignUpWizardContent() {
 
   const [otp, setOtp] = useState("");
   const [otpStatus, setOtpStatus] = useState<OTPStatus>("idle");
+  const [resendingOtp, setResendingOtp] = useState(false);
 
   const setCountryAndPrefix = (nextCountry: string) => {
     setCountry(nextCountry);
@@ -385,6 +386,21 @@ function SignUpWizardContent() {
               }}
             />
           </div>
+          <button type="button" disabled={resendingOtp} onClick={async () => {
+            setResendingOtp(true);
+            setFormError(undefined);
+            try {
+              const res = await fetch("/api/signup", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
+              if (!res.ok) {
+                const data = await res.json().catch(() => null);
+                setFormError(data?.message || (res.status === 429 ? "Too many resend requests. Try again after 12 hours." : "Could not resend code."));
+              }
+            } catch { setFormError("Network error. Please try again."); }
+            finally { setResendingOtp(false); }
+          }} className="text-center text-sm font-medium text-foreground underline underline-offset-4 disabled:opacity-50">
+            {resendingOtp ? "Resending…" : "Resend code"}
+          </button>
+          {formError ? <p role="alert" className="text-center text-xs text-destructive">{formError}</p> : null}
         </div>
       ) : null}
     </WizardShell>

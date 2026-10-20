@@ -51,8 +51,8 @@ export async function POST(req: NextRequest) {
     const secret = randomBase32();
     const codes = backupCodes();
     await updateUser(session.user.id, { two_fa_secret: secret, backup_codes: codes });
-    const label = encodeURIComponent(`Crypto Invest:${session.user.email}`);
-    const issuer = encodeURIComponent("Crypto Invest");
+    const label = encodeURIComponent(`Qouantex:${session.user.email}`);
+    const issuer = encodeURIComponent("Qouantex");
     const otpauth = `otpauth://totp/${label}?secret=${secret}&issuer=${issuer}&algorithm=SHA1&digits=6&period=30`;
     const qr = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(otpauth)}`;
     return NextResponse.json({ secret, backupCodes: codes, qr, otpauth });

@@ -57,3 +57,20 @@ export async function POST(req: NextRequest) {
     return setDeviceCookie(bad(message, message.startsWith("Too many") ? 429 : 500), device.id);
   }
 }
+
+export async function PUT(req: NextRequest) {
+  const body = await req.json().catch(() => null);
+  const device = getDevice(req);
+  try {
+    const { ipHash, deviceHash } = await assertRateLimit(req, "signup", device.id, 3);
+    const email = normalizeEmail(body?.email);
+    const user = await findUserByEmail(email);
+    if (!user || user.status !== "pending") return setDeviceCookie(bad("No pending signup found.", 404), device.id);
+    await createOtp(user.id, email, "signup");
+    await recordFailedAuthAttempt("signup", ipHash, deviceHash);
+    return setDeviceCookie(NextResponse.json({ ok: true }), device.id);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not resend code.";
+    return setDeviceCookie(bad(message, message.startsWith("Too many") ? 429 : 500), device.id);
+  }
+}

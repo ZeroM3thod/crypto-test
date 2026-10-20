@@ -148,12 +148,13 @@ export default function ForgotPasswordWizardPage() {
     setFormError(undefined);
     try {
       const res = await fetch("/api/forgot-password", {
-        method: "POST",
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
       if (!res.ok) {
-        setFormError("Couldn't resend the code. Please try again.");
+        const data = await res.json().catch(() => null);
+        setFormError(data?.message ?? "Couldn't resend the code. Please try again.");
       }
     } catch {
       setFormError("Network error. Please try again.");

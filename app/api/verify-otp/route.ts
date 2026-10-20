@@ -21,7 +21,8 @@ export async function POST(req: NextRequest) {
     await deleteExpiredPendingUsers();
     const existing = await findUserByEmail(email);
     const purpose = existing?.status === "pending" ? "signup" : "password_reset";
-    const user = await verifyOtp(email, cleanCode, purpose, purpose === "signup");
+    // Verification can fail later while activating the account; don't consume the OTP until that succeeds.
+    const user = await verifyOtp(email, cleanCode.trim(), purpose, false);
     if (!user) return bad("Invalid code.", 400);
     if (purpose === "signup") {
       const userId = await generateUserId();

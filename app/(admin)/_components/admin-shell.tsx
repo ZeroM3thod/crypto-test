@@ -1,6 +1,7 @@
 // app/(admin)/_components/admin-shell.tsx
 "use client";
 
+import Image from "next/image";
 import Avatar9 from "@/components/base-ui/avatar2";
 import { useRouter } from "next/navigation";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -206,20 +207,19 @@ export function AdminShell({ active: initialActive, children }: AdminShellProps)
         panelClassName="border-foreground/[0.08]"
       >
         <AnimatedSidebarHeader className="p-3 pb-2">
-          <div className="flex min-h-11 items-center gap-3 overflow-hidden px-2">
-            <div className="grid size-7 shrink-0 place-items-center rounded-lg bg-foreground text-background">
-              <Command aria-hidden="true" className="size-4" />
-            </div>
+          <div className="flex min-h-11 items-center gap-0 overflow-hidden px-2">
+            <Image src="/icon/bright.png" alt="" aria-hidden="true" unoptimized width={48} height={48} className="pointer-events-none absolute left-8 z-0 size-12 rounded-lg object-contain light:block dark:hidden" />
+            <Image src="/icon/dark.png" alt="" aria-hidden="true" unoptimized width={48} height={48} className="pointer-events-none absolute left-8 z-0 hidden size-12 rounded-lg object-contain light:hidden dark:block" />
             <button
               type="button"
               onClick={() => {
                 setActive("Dashboard");
                 router.push("/admin/dashboard");
               }}
-              className="flex min-w-0 flex-1 items-center gap-2 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-ring group-data-[state=collapsed]/sidebar:hidden"
+              className="relative z-10 flex min-w-0 flex-1 items-center gap-2 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-ring group-data-[state=collapsed]/sidebar:hidden"
             >
               <span className="truncate text-sm font-semibold text-foreground">
-                Admin Panel
+                <span className="ml-12">Qouantex</span>
               </span>
               <ChevronsUpDown
                 aria-hidden="true"

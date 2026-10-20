@@ -1,5 +1,6 @@
 import { createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { renderOtpEmail } from "@/lib/auth/email-template";
 
 const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
 const OTP_TTL_MS = 15 * 60 * 1000;
@@ -93,16 +94,26 @@ export function avatarForUser(id: string) {
   const files = [
     "0ba54b0d95.svg",
     "120029819f.svg",
+    "280411580b.svg",
     "2dfd8e6133.svg",
+    "37af80f2e8.svg",
+    "3a3ef3c153.svg",
     "4043a3e4ce.svg",
     "46a901bfbd.svg",
     "627297a79c.svg",
+    "74af47c15d.svg",
     "7a9c48e1b9.svg",
+    "7c92a8fc73.svg",
     "7d399d1de0.svg",
+    "87e9ca199a.svg",
+    "88b158c9e6.svg",
     "94b4a92d42.svg",
     "a1ac78ebe2.svg",
+    "a5ccb5667b.svg",
     "a624e74456.svg",
+    "c16bb9db41.svg",
     "d251fcc9b1.svg",
+    "f68735a503.svg",
   ];
   const fakeNames = "Anik_H Rahim_K Sadia_A Tanvir_M Nabil_R Fahim_H Rafi_S Imran_C Nusrat_J Sakib_A Mahin_T Ayesha_R Arif_M Tanjim_S Mim_N Shanto_D Sumaiya_F Rakib_U Farhan_I Jannat_B Aarav_S Vivaan_P Aanya_G Ishaan_R Diya_M Aditya_K Priya_S Arjun_V Ananya_D Rohan_J Kabir_A Meera_N Reyansh_T Ira_B Kavya_L Dev_C Aditi_W Vihaan_Q Saanvi_H Aryan_F Liam_W Noah_B Olivia_C Emma_D Lucas_M Mia_T Ethan_R Amelia_S Leo_P Sofia_G Mateo_L Isabella_K Oliver_J Chloe_N Daniel_A Yuki_T Haruto_S Sakura_M Ren_K Aiko_N Minjun_P Jiwoo_H Seojun_L Hana_C Jisoo_R Wei_Z Mei_L Jun_W Yuna_K Hiro_D Omar_A Layla_H Zain_R Mariam_S Yusuf_K Amir_N Noor_F Leila_M Samir_B Dina_T Luca_R Giulia_M Marco_F Elena_C Matteo_S Ines_D Hugo_P Camila_V Thiago_L Valentina_G Kwame_A Ama_B Kofi_D Zuri_M Nia_K Chidi_O Amara_E Tariq_J Amina_Y Malik_F Dara_S Sokha_N Minh_T Linh_P Arun_V Priyanka_D Kiran_J Riya_M Devika_S Ishan_B Maya_R Neil_K Tara_C Zoya_N Aman_L Hasan_Q Raisa_T Muntasir_E Tahmid_W Afra_Z Sohan_P Nafisa_G Adnan_Y Irfan_D Lamia_V Bikash_N Pooja_A Rahul_C Sneha_J Kunal_F Ishita_W Manav_B Riddhi_T Parth_M Shreya_K Zara_H Elias_P Mila_R Adam_S Lena_V Alex_D Ella_N James_C Ruby_L Oscar_F Amir_T Sara_B Rami_K Yara_M Talia_S Niko_A Elif_D Emir_G Aylin_P Kerem_J Diego_M Lucia_R Andres_C Sofia_L Pablo_T Freya_N Erik_B Astrid_H Sven_K Maja_D Maksim_P Anya_S Nikita_V Alina_C Dmitri_J Laila_R Owen_M Zane_T Kiara_B Jayden_N Aiden_F Ava_G Mason_W Layla_D Ezra_K Nora_P Theo_S Aria_C Kai_L Ivy_R Niamh_B Callum_M Freddie_J Isla_T Rowan_V Santiago_N Mariana_F Enzo_D Alma_K Rafael_P Aarohi_S Krishna_M Anushka_R Dhruv_C Ved_T Srinidhi_A Nandini_B Ritvik_J Ishani_V Om_L Ratul_M Oishi_D Mehedi_R Pritom_S Tisha_A Shafin_K Rumana_J Afnan_B Zubair_T Samiha_N Jubayer_F Rashed_C Maliha_P Saif_V Tasmia_G Shreyan_H Anvi_D Aarush_L Myra_W Reva_K Ibrahim_M Fatima_R Hamza_S Salma_A Bilal_N Nour_C Rayan_T Hiba_J Yara_F Karim_P Mariam_D Youssef_V Inaya_B Idris_K Aisha_L Abena_M Kojo_R Efua_S Tunde_A Lerato_N Sipho_D Thandi_J Neo_P Kabelo_F Amari_C Chloe_W Nathan_G Grace_T Isaac_B Zoe_H Evan_M Lily_R Ryan_S Hannah_K Aaron_D Junseo_P Sora_N Taeyang_C Nari_L Doyun_V Akira_J Rin_F Kaito_B Emi_T Naoki_A An_M Bao_R Thao_S Khanh_D Phuc_K Srey_P Vanna_C Dara_L Bounmy_N Kham_T Rohan_F Aarush_J Naira_V Yash_B Suhani_G Zainab_M Farid_R Hassan_C Rania_K Mina_D Elena_P Gabriel_S Nina_T Felix_A Milo_W Amelie_N Louis_B Clara_J Jonas_V Lara_F".split(" ");
   const key = id.trim().toLowerCase();
@@ -135,7 +146,7 @@ export function setDeviceCookie(res: NextResponse, deviceId: string) {
   return res;
 }
 
-export async function assertRateLimit(req: NextRequest, action: string, deviceId: string) {
+export async function assertRateLimit(req: NextRequest, action: string, deviceId: string, maxRequests = 5) {
   const since = new Date(Date.now() - TWELVE_HOURS_MS).toISOString();
   const ipHash = hash(getIp(req));
   const deviceHash = hash(deviceId || req.headers.get("user-agent") || "unknown");
@@ -143,7 +154,7 @@ export async function assertRateLimit(req: NextRequest, action: string, deviceId
     supabase<{ id: string }[]>(`auth_attempts?select=id&action=eq.${q(action)}&ip_hash=eq.${q(ipHash)}&created_at=gte.${q(since)}`),
     supabase<{ id: string }[]>(`auth_attempts?select=id&action=eq.${q(action)}&device_hash=eq.${q(deviceHash)}&created_at=gte.${q(since)}`),
   ]);
-  if (ipRows.length >= 5 || deviceRows.length >= 5) {
+  if (ipRows.length >= maxRequests || deviceRows.length >= maxRequests) {
     throw new Error("Too many attempts. Please try again after 12 hours.");
   }
   return { ipHash, deviceHash };
@@ -184,15 +195,18 @@ function code6() {
 }
 
 export async function sendOtp(email: string, code: string, purpose: OtpPurpose) {
-  const subject = purpose === "signup" ? "Confirm your account" : "Reset your password";
-  const text = `Your ${subject.toLowerCase()} code is ${code}. It expires in 15 minutes.`;
+  const { subject, html, text } = renderOtpEmail({
+    code,
+    purpose: purpose === "password_reset" ? "reset" : purpose,
+    expiresInMinutes: OTP_TTL_MS / 60_000,
+  });
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.AUTH_EMAIL_FROM;
   if (apiKey && from) {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from, to: email, subject, text }),
+      body: JSON.stringify({ from, to: email, subject, html, text }),
     });
     if (!res.ok) {
       if (process.env.NODE_ENV !== "production") {

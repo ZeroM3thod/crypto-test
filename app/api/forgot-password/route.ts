@@ -6,6 +6,7 @@ import {
   findUserByEmail,
   getDevice,
   normalizeEmail,
+  recordFailedAuthAttempt,
   setDeviceCookie,
 } from "@/lib/auth/backend";
 
@@ -24,6 +25,23 @@ export async function POST(req: NextRequest) {
     return setDeviceCookie(NextResponse.json({ ok: true }), device.id);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Password reset failed.";
+    return setDeviceCookie(bad(message, message.startsWith("Too many") ? 429 : 500), device.id);
+  }
+}
+
+export async function PUT(req: NextRequest) {
+  const body = await req.json().catch(() => null);
+  const device = getDevice(req);
+  try {
+    const { ipHash, deviceHash } = await assertRateLimit(req, "forgot_password", device.id, 3);
+    const email = normalizeEmail(body?.email);
+    const user = await findUserByEmail(email);
+    if (!user || user.status !== "active") return setDeviceCookie(bad("We couldn't find an account with that email.", 404), device.id);
+    await createOtp(user.id, email, "password_reset");
+    await recordFailedAuthAttempt("forgot_password", ipHash, deviceHash);
+    return setDeviceCookie(NextResponse.json({ ok: true }), device.id);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not resend code.";
     return setDeviceCookie(bad(message, message.startsWith("Too many") ? 429 : 500), device.id);
   }
 }

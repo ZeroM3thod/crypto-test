@@ -87,8 +87,8 @@ export default function SignInPage() {
       <WizardShell shaderSide="right" stepKey="signin">
       <div className="flex w-full flex-col gap-5">
         <div className="flex flex-col gap-1">
-          <h2 className="text-xl font-semibold tracking-tight text-white">Welcome back</h2>
-          <p className="text-sm text-white">Sign in to continue.</p>
+          <h2 className="text-xl font-semibold tracking-tight text-foreground">Welcome back</h2>
+          <p className="text-sm text-muted-foreground">Sign in to continue.</p>
         </div>
 
         <div className="flex flex-col gap-4">
@@ -147,7 +147,7 @@ export default function SignInPage() {
           <button
             type="button"
             onClick={() => router.push("/forgot-password")}
-            className="text-sm font-medium text-white underline-offset-4 hover:underline"
+            className="text-sm font-medium text-foreground underline-offset-4 hover:underline"
           >
             Forgot password?
           </button>
@@ -178,12 +178,12 @@ export default function SignInPage() {
           </StatefulButton>
         </div>
 
-        <div className="text-center text-sm text-white">
+        <div className="text-center text-sm text-muted-foreground">
           Don&apos;t have an account?{" "}
           <button
             type="button"
             onClick={() => router.push("/signup")}
-            className="font-medium text-white underline underline-offset-4"
+            className="font-medium text-foreground underline underline-offset-4"
           >
             Sign up
           </button>

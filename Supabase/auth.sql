@@ -1250,18 +1250,6 @@ begin
 end;
 $$;
 
-create or replace function public.set_referral_eligible_on_deposit()
-returns trigger language plpgsql security definer set search_path=public as $$
-begin
-  if new.status='approved' and (tg_op='INSERT' or old.status is distinct from 'approved') then
-    perform public.mark_referral_eligible(new.user_id);
-  end if;
-  return new;
-end; $$;
-drop trigger if exists deposits_mark_referral_eligible on public.deposits;
-create trigger deposits_mark_referral_eligible after insert or update of status on public.deposits
-for each row execute function public.set_referral_eligible_on_deposit();
-
 create or replace function public.credit_referral_milestone(p_user_id uuid, p_milestone_id uuid, p_count int)
 returns void language plpgsql security definer set search_path = public as $$
 declare v_reward numeric;
@@ -1339,6 +1327,18 @@ create table if not exists public.deposits (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+create or replace function public.set_referral_eligible_on_deposit()
+returns trigger language plpgsql security definer set search_path=public as $$
+begin
+  if new.status='approved' and (tg_op='INSERT' or old.status is distinct from 'approved') then
+    perform public.mark_referral_eligible(new.user_id);
+  end if;
+  return new;
+end; $$;
+drop trigger if exists deposits_mark_referral_eligible on public.deposits;
+create trigger deposits_mark_referral_eligible after insert or update of status on public.deposits
+for each row execute function public.set_referral_eligible_on_deposit();
 
 -- Withdrawals
 create table if not exists public.withdrawals (
