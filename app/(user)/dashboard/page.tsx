@@ -496,7 +496,7 @@ export default function DashboardPage() {
               onDeposit={() => router.push("/fund/deposit")}
               onWithdraw={() => router.push("/fund/withdraw")}
               onTransfer={() => setTransferOpen(true)}
-              onInvest={() => router.push("/invest/daily-profit")}
+              onInvest={() => router.push("/fund/send")}
             />
           </div>
         </section>
