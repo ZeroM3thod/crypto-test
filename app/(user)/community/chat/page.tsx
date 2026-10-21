@@ -2,6 +2,7 @@
 "use client";
 
 import { UserShell } from "@/app/(user)/_components/user-shell";
+import { DitherLoader } from "@/components/motion/loader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -488,7 +489,7 @@ export default function CommunityChat() {
           {/* ── Messages ─────────────────────────────────── */}
           <div ref={scrollerRef} onScroll={(e) => { const el = e.currentTarget; if (el.scrollTop < 80) void loadOlder(); setShowLatest(el.scrollHeight - el.scrollTop - el.clientHeight > 120); }} className="relative min-h-0 flex-1 overflow-y-auto px-3 py-5 sm:px-5">
             <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col gap-3">
-              {chatLoading ? <p className="m-auto text-sm text-muted-foreground">Loading chat…</p> : chatError && messages.length === 0 ? <p className="m-auto text-sm text-muted-foreground">{chatError}</p> : messages.length === 0 ? <p className="m-auto text-sm text-muted-foreground">No messages yet.</p> : messages.map((msg) => (
+              {chatLoading ? <DitherLoader className="m-auto" size={44} label="Loading chat" /> : chatError && messages.length === 0 ? <p className="m-auto text-sm text-muted-foreground">{chatError}</p> : messages.length === 0 ? <p className="m-auto text-sm text-muted-foreground">No messages yet.</p> : messages.map((msg) => (
                 <MessageBubble key={msg.id} msg={msg} onReply={setReplyTo} onReport={setReportTarget} />
               ))}
               {typingMessage && <div key={typingMessage.id} className="flex items-end gap-2 self-start" aria-label={`${typingMessage.username} is typing`}><AvatarGlyph letter={typingMessage.avatar} src={typingMessage.avatarUrl} /><div className="flex items-center gap-1 rounded-2xl bg-muted px-3 py-2.5">{[0, 1, 2].map((dot) => <span key={dot} className="size-1.5 animate-bounce rounded-full bg-muted-foreground" style={{ animationDelay: `${dot * 150}ms` }} />)}</div></div>}

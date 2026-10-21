@@ -2,6 +2,7 @@
 "use client";
 
 import { UserShell } from "@/app/(user)/_components/user-shell";
+import { DitherLoader } from "@/components/motion/loader";
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -694,6 +695,7 @@ export default function AiTradingPage() {
 
   return (
     <UserShell active="AI Trading">
+      {loading ? <div className="grid min-h-[70vh] place-items-center"><DitherLoader size={44} label="Loading AI trading data" /></div> : <>
       <div className="overflow-y-auto px-5 py-6 sm:px-7 sm:py-8 space-y-8">
 
         {/* ── Header ────────────────────────────────────── */}
@@ -790,6 +792,7 @@ export default function AiTradingPage() {
         onClose={() => setInvesting(null)}
         onConfirm={handleInvest}
       />
+      </>}
     </UserShell>
   );
 }

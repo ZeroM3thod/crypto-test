@@ -2,6 +2,7 @@
 "use client";
 
 import { UserShell } from "@/app/(user)/_components/user-shell";
+import { DitherLoader } from "@/components/motion/loader";
 import { useRouter } from "next/navigation";
 import { OTPInput, type OTPStatus } from "@/components/motion/otp-input";
 import {
@@ -548,6 +549,7 @@ export default function SecurityPage() {
   const [deleteError, setDeleteError] = useState("");
   const [passwordChangedAt, setPasswordChangedAt] = useState("");
   const [sessions, setSessions] = useState<SessionRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ msg: string; show: boolean }>({ msg: "", show: false });
 
   const showToast = useCallback((msg: string) => {
@@ -563,6 +565,7 @@ export default function SecurityPage() {
       setPasswordChangedAt(data.passwordChangedAt || "");
       setSessions(data.sessions || []);
     }
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -598,6 +601,7 @@ export default function SecurityPage() {
 
   return (
     <UserShell active="Security">
+      {loading ? <div className="grid min-h-[70vh] place-items-center"><DitherLoader size={44} label="Loading security settings" /></div> : <>
       <div className="relative overflow-y-auto px-5 py-6 sm:px-7 sm:py-8">
         {/* Toast */}
         {toast.show && (
@@ -807,6 +811,7 @@ export default function SecurityPage() {
           </div>
         </div>
       )}
+      </>}
     </UserShell>
   );
 }
