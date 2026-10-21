@@ -637,7 +637,8 @@ export default function AiTradingPage() {
       const inv = data.investments.find((x: any) => x.strategy_id === s.strategy_id);
       const elapsed = inv ? Math.max(0, Math.floor((Date.now() - new Date(inv.invested_at).getTime()) / 86400000)) : 0;
       const daysLeft = inv ? Math.max(0, Math.ceil((new Date(inv.unlock_at).getTime() - Date.now()) / 86400000)) : 0;
-      return { id:s.strategy_id,name:s.name,exchange:s.exchange,minStake:Number(s.min_stake),roiPct:Number(s.total_roi_pct),todayRoiPct:Number(s.today_roi_pct||0),daysRunning:Number(s.days_running),lockDays:Number(inv?.lock_days ?? s.lock_days),daysElapsed:elapsed,status:!inv?"not-invested":inv.status === "unlocked" || daysLeft === 0?"unlocked":"running",invested:inv?Number(inv.amount):undefined,currentProfit:inv?Number(inv.total_profit):undefined,investmentId:inv?.id };
+      const strategyDaysRunning = s.started_at ? Math.max(0, Math.floor((Date.now() - new Date(s.started_at).getTime()) / 86400000)) : Number(s.days_running);
+      return { id:s.strategy_id,name:s.name,exchange:s.exchange,minStake:Number(s.min_stake),roiPct:Number(s.total_roi_pct),todayRoiPct:Number(s.today_roi_pct||0),daysRunning:strategyDaysRunning,lockDays:Number(inv?.lock_days ?? s.lock_days),daysElapsed:elapsed,status:!inv?"not-invested":inv.status === "unlocked" || daysLeft === 0?"unlocked":"running",invested:inv?Number(inv.amount):undefined,currentProfit:inv?Number(inv.total_profit):undefined,investmentId:inv?.id };
     });
     setStrategies(mapped);
     setBalance(Number(data.balance) || 0);
