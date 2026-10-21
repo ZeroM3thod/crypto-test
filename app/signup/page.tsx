@@ -41,6 +41,8 @@ function SignUpWizardContent() {
   const [country, setCountry] = useState("");
   const [dob, setDob] = useState<DobValue>(DEFAULT_DOB);
   const [referral, setReferral] = useState("");
+  const [emailExists, setEmailExists] = useState(false);
+  const [referralExists, setReferralExists] = useState<boolean | null>(null);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [terms, setTerms] = useState(false);
@@ -71,6 +73,33 @@ function SignUpWizardContent() {
   }, []);
 
   const strength = passwordStrength(password);
+
+  useEffect(() => {
+    const validEmail = EMAIL_PATTERN.test(email.trim());
+    const code = referral.trim();
+    if (!validEmail && !code) {
+      setEmailExists(false);
+      setReferralExists(null);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch("/api/signup/check", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: validEmail ? email : "", referral: code }),
+        });
+        if (!res.ok) return;
+        const result = await res.json();
+        if (!cancelled) {
+          setEmailExists(validEmail && result.emailExists);
+          setReferralExists(code ? result.referralExists : null);
+        }
+      } catch { /* Keep signup usable if validation is temporarily unavailable. */ }
+    }, 350);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [email, referral]);
 
   // ---- Per-step validation ----
   const stepErrors = useMemo(() => {
@@ -221,7 +250,7 @@ function SignUpWizardContent() {
             value={email}
             onChange={setEmail}
             onBlur={() => touch("email")}
-            error={shownError("email")}
+            error={emailExists ? "That email already exists." : shownError("email")}
             reserveErrorLine
             success={touched.email && !stepErrors.email && Boolean(email)}
           />
@@ -277,6 +306,7 @@ function SignUpWizardContent() {
             placeholder="e.g. FRIEND25"
             value={referral}
             onChange={setReferral}
+            error={referralExists === false ? "Referral not found. Please skip or try a valid referral code." : undefined}
             reserveErrorLine
           />
         </StepCard>
