@@ -276,12 +276,13 @@ function mapStatus(status: string): 'Completed' | 'Pending' | 'Failed' {
 
 function getNotificationTitle(type: string): string {
   const map: Record<string, string> = {
-    deposit: 'Deposit Confirmed',
-    withdrawal_pending: 'Withdrawal Pending',
-    withdrawal_refund: 'Withdrawal Refunded',
-    daily_profit_credit: 'Daily Profit Credited',
-    ai_trading_invest: 'AI Trading Activated',
-    referral_commission: 'Referral Commission Earned',
+    deposit: 'Deposit',
+    withdrawal_pending: 'Withdraw',
+    withdrawal_refund: 'Withdraw',
+    send: 'Send',
+    receive: 'Received',
+    daily_profit_credit: 'Reward',
+    referral_commission: 'Reward',
   };
   return map[type] || 'Transaction';
 }
