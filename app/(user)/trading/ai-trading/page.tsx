@@ -556,7 +556,6 @@ function StrategyCard({
           {isEmpty && (
             <StatefulButton
               className="h-10 w-full text-xs"
-              variant="success"
               state="idle"
               onClick={() => onInvest(strategy)}
             >
@@ -575,7 +574,7 @@ function StrategyCard({
           {isUnlocked && (
             <StatefulButton
               className="h-10 w-full text-xs"
-              variant="destructive"
+              variant="outline"
               state={state}
               onClick={runWithdraw}
             >

@@ -303,7 +303,7 @@ export function OrderPanel({
         <SummaryRow
           label="Avg. price"
           value={priceLabel}
-          icon={<ActionSwap showA={isBuy} a={<span>·</span>} b={<span>·</span>} />}
+          icon={<ActionSwap items={[{ id: "price", label: "·" }]} cycle={false} />}
         />
         <SummaryRow label="Units" value={shares.toLocaleString("en-US", { maximumFractionDigits: 2 })} />
         <SummaryRow label={isBuy ? "Cost" : "Est. proceeds"} value={`$${amount.toFixed(2)}`} />
@@ -321,7 +321,7 @@ export function OrderPanel({
       <div className="p-4">
         <StatefulButton
           className="h-12 w-full text-sm"
-          variant={isBuy ? "success" : "destructive"}
+          variant={isBuy ? "primary" : "outline"}
           state={submitState}
           disabled={!canSubmit}
           onClick={submit}
