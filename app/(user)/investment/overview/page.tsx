@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Table } from "@/components/motion/table";
 
 // ── Shared primitives (same as dashboard) ───────────────────────────────────
@@ -433,6 +434,7 @@ function PackageDetailsDialog({
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function InvestmentOverviewPage() {
+  const router = useRouter();
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>("All");
   const [selectedPackage, setSelectedPackage] = useState<InvestedPackage | null>(null);
   const [loading, setLoading] = useState(true);
@@ -511,6 +513,7 @@ export default function InvestmentOverviewPage() {
         <div className="flex justify-end">
           <button
             type="button"
+            onClick={() => router.push("/investment/daily-profit")}
             className="flex items-center gap-2 rounded-xl bg-foreground px-4 py-2.5 text-xs font-semibold text-background transition-opacity hover:opacity-80 outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Plus className="size-3.5" />
