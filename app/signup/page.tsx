@@ -388,6 +388,9 @@ function SignUpWizardContent() {
             <p className="text-sm text-muted-foreground">
               We sent a 6-digit code to {email || "your email"}.
             </p>
+            <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
+              Important: Don’t see the code? Check your spam or junk folder.
+            </p>
           </div>
           <div className="flex justify-center">
             <OTPInput
