@@ -24,7 +24,7 @@ export function AiTrading() {
           <div className="w-3 h-3 rounded-full bg-outline-variant/30" />
           <div className="w-3 h-3 rounded-full bg-outline-variant/30" />
         </div>
-        <pre className="text-sm font-mono text-white/80 whitespace-pre-wrap">
+        <pre className="text-sm font-mono text-on-surface whitespace-pre-wrap">
           <code>
             <span className="text-on-tertiary-container">package</span>
             {" = AI_Trading(min="}

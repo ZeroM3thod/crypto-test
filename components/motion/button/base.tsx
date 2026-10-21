@@ -18,13 +18,7 @@ import { EASE_OUT, SPRING_PRESS } from "@/lib/ease";
 import { useHoverCapable } from "@/lib/hooks/use-hover-capable";
 import { cn } from "@/lib/utils";
 
-export type ButtonVariant =
-  | "primary"
-  | "secondary"
-  | "ghost"
-  | "outline"
-  | "success"
-  | "destructive";
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "outline";
 export type ButtonSize = "sm" | "md" | "lg" | "icon";
 
 export interface ButtonProps extends Omit<
@@ -54,11 +48,9 @@ type Ripple = { id: number; x: number; y: number; size: number };
 const VARIANT_CLASS: Record<ButtonVariant, string> = {
   primary: "bg-primary text-primary-foreground hover:bg-primary/90",
   secondary: "border border-border bg-card text-foreground hover:border-border",
-  ghost: "text-muted-foreground hover:text-foreground hover:bg-primary/5",
+  ghost: "text-muted-foreground hover:text-foreground hover:bg-muted/60",
   outline:
-    "border border-border bg-transparent text-foreground hover:bg-primary/5",
-  success: "bg-success text-background hover:bg-success/90",
-  destructive: "bg-destructive text-background hover:bg-destructive/90",
+    "border border-border bg-transparent text-foreground hover:bg-muted/60",
 };
 
 const SIZE_CLASS: Record<ButtonSize, string> = {

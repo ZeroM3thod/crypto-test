@@ -102,7 +102,7 @@ const INITIAL_HISTORY: DepHistory[] = [];
 
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-4xl border border-border bg-card p-6 ${className}`}>
+    <div className={`rounded-4xl border border-border bg-card p-5 sm:p-6 ${className}`}>
       {children}
     </div>
   );
@@ -263,16 +263,16 @@ export default function DepositPage() {
 
   return (
     <UserShell active="Deposit">
-      <div className="relative overflow-y-auto px-5 py-6 sm:px-7 sm:py-8">
+      <div className="relative overflow-y-auto px-4 py-5 sm:px-7 sm:py-8 lg:px-10">
         {/* Toast */}
         {toast.show && (
-          <div className="fixed right-6 top-6 z-[999] flex items-center gap-2 rounded-2xl border border-border bg-foreground px-4 py-3 text-sm font-medium text-background shadow-lg">
+          <div className="fixed left-4 right-4 top-4 z-[999] flex items-center gap-2 rounded-2xl sm:left-auto sm:right-6 sm:top-6 sm:max-w-sm border border-border bg-foreground px-4 py-3 text-sm font-medium text-background shadow-lg">
             <Check className="size-4" />
             {toast.msg}
           </div>
         )}
 
-        <div className="mx-auto max-w-2xl space-y-6">
+        <div className="mx-auto w-full max-w-2xl space-y-6 lg:max-w-3xl">
           {/* Header */}
           <div>
             <p className="text-xs font-medium text-muted-foreground">Transactions</p>
@@ -314,7 +314,7 @@ export default function DepositPage() {
                   {n < 4 && (
                     <div
                       className={[
-                        "mx-2 h-px flex-1 transition-colors",
+                        "mx-1.5 h-px flex-1 transition-colors sm:mx-2",
                         step > n ? "bg-foreground" : "bg-border",
                       ].join(" ")}
                     />
@@ -339,7 +339,7 @@ export default function DepositPage() {
                       key={a.id}
                       onClick={() => setDepState((s) => ({ ...s, asset: a.id, network: "" }))}
                       className={[
-                        "flex items-center gap-3 rounded-2xl border p-3 text-left transition-colors",
+                        "flex min-w-0 items-center gap-3 rounded-2xl border p-3 text-left transition-colors",
                         depState.asset === a.id
                           ? "border-foreground bg-foreground/5"
                           : "border-border hover:border-foreground/40",
@@ -400,6 +400,7 @@ export default function DepositPage() {
                 <Label>Custom Amount ({depState.asset})</Label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   min={30}
                   placeholder="Enter amount e.g. 750"
                   value={customAmt}
@@ -409,23 +410,23 @@ export default function DepositPage() {
                     setDepState((s) => ({ ...s, amount: v }));
                     setSelectedChip(null);
                   }}
-                  className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-foreground"
+                  className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-base text-foreground outline-none sm:text-sm transition-colors placeholder:text-muted-foreground focus:border-foreground"
                 />
                 <p className="mt-1.5 text-xs text-muted-foreground">Minimum deposit: $30</p>
               </div>
 
               {/* Summary pill */}
-              <div className="mb-5 flex items-center gap-3 rounded-2xl border border-border bg-muted/40 p-4">
-                <div className="flex size-9 items-center justify-center rounded-full bg-foreground text-xs font-bold text-background">
+              <div className="mb-5 flex items-center gap-3 rounded-2xl border border-border bg-muted/40 p-3 sm:p-4">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-foreground text-xs font-bold text-background">
                   {ASSETS.find((a) => a.id === depState.asset)?.symbol}
                 </div>
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-foreground">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium text-foreground">
                     {ASSETS.find((a) => a.id === depState.asset)?.name}
                   </div>
-                  <div className="text-xs text-muted-foreground">Stablecoin · 1 {depState.asset} ≈ $1.00</div>
+                  <div className="truncate text-xs text-muted-foreground">Stablecoin · 1 {depState.asset} ≈ $1.00</div>
                 </div>
-                <div className="text-lg font-semibold text-foreground">
+                <div className="shrink-0 text-base font-semibold text-foreground sm:text-lg">
                   {depState.amount > 0 ? `$${depState.amount.toLocaleString()}` : "—"}
                 </div>
               </div>
@@ -461,13 +462,13 @@ export default function DepositPage() {
                       key={net}
                       onClick={() => setDepState((s) => ({ ...s, network: net }))}
                       className={[
-                        "flex items-center gap-3 rounded-2xl border p-4 text-left transition-colors",
+                        "flex items-center gap-3 rounded-2xl border p-3 text-left transition-colors sm:p-4",
                         isSelected
                           ? "border-foreground bg-foreground/5"
                           : "border-border hover:border-foreground/40",
                       ].join(" ")}
                     >
-                      <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-muted">
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted sm:size-11">
                         <Wallet className="size-5 text-foreground" />
                       </div>
                       <div className="min-w-0 flex-1">
@@ -524,7 +525,7 @@ export default function DepositPage() {
                 </p>
               )}
 
-              <div className="mb-5 grid gap-5 sm:grid-cols-[160px_1fr]">
+              <div className="mb-5 grid gap-5 sm:grid-cols-[160px_minmax(0,1fr)]">
                 {/* QR */}
                 <div className="flex flex-col items-center gap-2">
                   <div className="flex size-[160px] items-center justify-center overflow-hidden rounded-2xl border border-border bg-muted/40">
@@ -538,17 +539,17 @@ export default function DepositPage() {
                 </div>
 
                 {/* Address + summary */}
-                <div className="flex flex-col gap-4">
+                <div className="flex min-w-0 flex-col gap-4">
                   <div>
                     <Label>Deposit Address</Label>
                     <div className="flex items-center gap-2 rounded-2xl border border-border bg-muted/30 p-3">
-                      <span className="flex-1 truncate font-mono text-xs text-foreground">
+                      <span className="min-w-0 flex-1 break-all font-mono text-xs text-foreground">
                         {depState.address}
                       </span>
                       <button
                         onClick={copyAddress}
                         className={[
-                          "flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors",
+                          "flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] sm:py-1 font-semibold transition-colors",
                           addrCopied
                             ? "bg-foreground text-background"
                             : "bg-muted text-foreground hover:bg-muted/70",
@@ -621,7 +622,7 @@ export default function DepositPage() {
                   placeholder="e.g. 0xabcd1234…ef56 or TXN hash"
                   value={txnId}
                   onChange={(e) => setTxnId(e.target.value)}
-                  className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-foreground"
+                  className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-base text-foreground outline-none sm:text-sm transition-colors placeholder:text-muted-foreground focus:border-foreground"
                 />
                 <p className="mt-1.5 text-xs text-muted-foreground">
                   Copy the transaction hash from your wallet or exchange after sending.
@@ -635,9 +636,9 @@ export default function DepositPage() {
                   ["Network", depState.network],
                   ["To Receive", `${depState.amount} ${depState.asset}`],
                 ].map(([k, v]) => (
-                  <div key={k} className="flex items-center justify-between border-b border-border py-2 last:border-none">
+                  <div key={k} className="flex items-center justify-between gap-3 border-b border-border py-2 last:border-none">
                     <span className="text-xs text-muted-foreground">{k}</span>
-                    <span className="text-sm font-medium text-foreground">{v}</span>
+                    <span className="min-w-0 text-right text-sm font-medium text-foreground">{v}</span>
                   </div>
                 ))}
               </div>
@@ -666,7 +667,7 @@ export default function DepositPage() {
                 history.map((d) => (
                   <div
                     key={d.id}
-                    className="flex items-center justify-between rounded-2xl border border-border p-3.5"
+                    className="flex items-center justify-between gap-3 rounded-2xl border border-border p-3.5"
                   >
                     <div className="flex min-w-0 items-center gap-3">
                       <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted">
@@ -719,7 +720,7 @@ export default function DepositPage() {
               if (e.target === e.currentTarget) setModalOpen(false);
             }}
           >
-            <div className="w-full max-w-md rounded-t-4xl border border-border bg-card p-6 sm:rounded-4xl">
+            <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-4xl border border-border bg-card p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:rounded-4xl sm:p-6">
               <div className="mb-5 flex items-center justify-between">
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Transaction</p>
@@ -742,9 +743,9 @@ export default function DepositPage() {
                   ["Amount Received", `${modalEntry.amount} ${modalEntry.asset}`],
                   ["Network", modalEntry.network],
                 ].map(([k, v]) => (
-                  <div key={k} className="flex items-center justify-between border-b border-border py-2 last:border-none">
+                  <div key={k} className="flex items-center justify-between gap-3 border-b border-border py-2 last:border-none">
                     <span className="text-xs text-muted-foreground">{k}</span>
-                    <span className="max-w-[200px] truncate text-right text-sm font-medium text-foreground">{v}</span>
+                    <span className="min-w-0 max-w-[60%] truncate text-right text-sm font-medium text-foreground">{v}</span>
                   </div>
                 ))}
                 <div className="flex items-center justify-between pt-2">

@@ -18,8 +18,7 @@
   --chart-grid: rgba(255, 255, 255, 0.06);
 }
 
-html.dark,
-:root[data-theme="dark"] {
+html.dark {
   --background: #151515;
   --foreground: #ededed;
   --border: #2a2a2a;
@@ -36,8 +35,7 @@ html.dark,
   --chart-grid: rgba(255, 255, 255, 0.06);
 }
 
-html.light,
-:root[data-theme="light"] {
+html.light {
   --background: #f8fafc;
   --foreground: #09090b;
   --border: #e4e4e7;
@@ -133,6 +131,8 @@ body {
   --c-inverse-primary: 200 198 197;
   --c-surface-container-low: 243 243 243;
   --c-on-secondary-fixed: 27 28 28;
+
+  color: rgb(var(--c-on-surface));
 
   /* Your app already has a `primary` colour (blue). Inside .qx ONLY,
      point it at the landing page's primary (near-black / near-white). */
@@ -290,3 +290,17 @@ body {
     cursor: pointer;
   }
 }
+
+/* Keep legacy landing-page muted labels readable in both palettes. */
+.qx .text-outline { color: rgb(var(--c-on-surface-variant)); }
+
+.qx .bg-primary {
+  background-color: rgb(var(--c-primary));
+}
+.qx .text-primary { color: rgb(var(--c-primary)); }
+.qx .text-on-primary { color: rgb(var(--c-on-primary)); }
+.qx .bg-primary:is(button, a),
+.qx button.bg-primary,
+.qx a.bg-primary,
+.qx button.bg-primary *,
+.qx a.bg-primary * { color: rgb(var(--c-on-primary)); }

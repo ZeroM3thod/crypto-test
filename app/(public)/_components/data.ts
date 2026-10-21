@@ -2,6 +2,8 @@
 
 /** Shared card surface used by most boxes on the page */
 export const CARD = "bg-surface-container-lowest border border-outline-variant";
+export const SECTION = "mx-auto mb-24 max-w-7xl px-4 sm:px-6 lg:px-8";
+export const H2 = "text-3xl font-semibold tracking-tight text-balance text-foreground sm:text-4xl";
 
 export type IconItem = { icon: string; title: string; desc: string };
 
@@ -16,13 +18,20 @@ export const PNL = [
   { label: "All-Time", value: "+86.7%" },
 ];
 
+export type WalletTab = "Main" | "Investment" | "Trading";
+export const WALLET_PREVIEW: Record<WalletTab, { value: number; pnl: { label: string; value: string }[] }> = {
+  Main: { value: 3240, pnl: PNL.map((p) => ({ label: p.label, value: "—" })) },
+  Investment: { value: 12480.55, pnl: PNL },
+  Trading: { value: 5120.3, pnl: [{ label: "Today", value: "+0.9%" }, { label: "7-Day", value: "+4.1%" }, { label: "30-Day", value: "+12.6%" }, { label: "All-Time", value: "+38.2%" }] },
+};
+
 /* ---------- Trust strip ---------- */
 export const METRICS = [
-  { value: "$10M+", label: "Total assets managed" },
-  { value: "2.5%", label: "Max daily plan return" },
-  { value: "68.4%", label: "AI trading win rate" },
-  { value: "99.98%", label: "Platform uptime" },
-  { value: "50,000+", label: "Active traders" },
+  { value: 10, prefix: "$", suffix: "M+", decimals: 0, label: "Total assets managed" },
+  { value: 2.5, prefix: "", suffix: "%", decimals: 1, label: "Max daily plan return" },
+  { value: 68.4, prefix: "", suffix: "%", decimals: 1, label: "AI trading win rate" },
+  { value: 99.98, prefix: "", suffix: "%", decimals: 2, label: "Platform uptime" },
+  { value: 50000, prefix: "", suffix: "+", decimals: 0, label: "Active traders" },
 ];
 
 /* ---------- Features ---------- */

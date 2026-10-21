@@ -1,5 +1,4 @@
 "use client";
-// beui.dev/components/motion/card
 
 import { animate, isDragActive, motion, useMotionValue, useReducedMotion } from "motion/react";
 import { type ComponentPropsWithRef, createContext, useContext, useEffect, useRef } from "react";

@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { Icon } from "./icon";
 import { FOOTER_COLUMNS } from "./data";
+import { Logo } from "./logo";
 
 export function Footer() {
   return (
@@ -22,9 +23,7 @@ export function Footer() {
       {/* Link grid */}
       <div className="max-w-[1280px] mx-auto px-6 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-12 mb-16">
         <div className="col-span-2 md:col-span-4 lg:col-span-2">
-          <div className="text-2xl font-bold tracking-tighter text-on-surface mb-6">
-            Qouantex
-          </div>
+          <Logo className="mb-6 text-2xl" />
           <p className="font-body text-sm text-on-surface-variant mb-6 pr-4">
             The all-in-one intelligent crypto wealth and trading ecosystem.
           </p>

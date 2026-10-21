@@ -1,224 +1,75 @@
-I built the whole page on beUI's design language, with every section responsive on mobile, tablet and desktop.
-
-beUI is a Motion + Tailwind v4 + shadcn-token library, and it uses a glass look with spring motion on a `#151515` dark base. I used its exact theme tokens and its real **Bouncy Accordion** (for the FAQ). I couldn't read the source for beUI's other components, so I wrote the button, pill tabs, tilt card, number ticker, text reveal and theme toggle myself in the same style, with the same springs, tokens and glass utilities. I haven't run this code, so test it in your project.
 
 ## 1. Install
 
 ```bash
-npm i motion lucide-react clsx tailwind-merge
-npx shadcn@latest add @beui/bouncy-accordion
+npm i motion lucide-react clsx tailwind-merge next-themes shiki
+
+npx shadcn@latest add @beui/button @beui/card @beui/tabs @beui/tilt-card @beui/number @beui/text-animation @beui/scroll-animation @beui/theme-toggle @beui/bouncy-accordion @beui/code-block
 ```
 
-If the `@beui` namespace isn't configured in your project, copy the accordion source from the Manual tab on beui.dev/components/motion/bouncy-accordion instead. It needs `lib/utils.ts` and `lib/ease.ts` below.
+This installs the real files at `@/components/motion/{button,card,tabs,tilt-card,number-ticker,text-reveal,text-shimmer,scroll-reveal,theme-toggle,bouncy-accordion,action-swap}`, `@/components/agents/code-block` (plus `agent-code`), and `@/lib/hooks/use-hover-capable`. The registry slugs `number` and `text-animation` come from the repo's registry list. If the CLI doesn't resolve one, copy the file from `github.com/starc007/ui-components/tree/main/components/motion`.
 
-Your root `<html>` must keep the `dark` class (you already do this). Delete `icon.tsx` because lucide icons replace it.
+Use the `lib/utils.ts` and `lib/ease.ts` from my previous message. They match the repo exactly.
 
-## 2. `app/globals.css`
+**Delete** `_components/ui.tsx` and `_components/theme-toggle.tsx`. The beUI versions replace them.
 
-Put this right under `@import "tailwindcss";`. It is the beUI theme plus a rule for the theme-toggle animation. If other parts of your app still use the old `qx` tokens (`bg-surface`, `text-on-surface`, etc.), keep those definitions and check that the new `--color-primary` doesn't clash with theirs.
+**Remove** the `::view-transition-*` block at the bottom of `globals.css`, since beUI's ThemeToggle injects its own. The rest of the theme CSS stays.
 
-```css
-@custom-variant dark (&:where(.dark, .dark *));
+## 2. Theme provider
 
-:root {
-  --background: oklch(99% 0 0);
-  --foreground: oklch(15% 0 0);
-  --card: oklch(97% 0 0);
-  --muted-foreground: oklch(50% 0 0);
-  --border: oklch(15% 0 0 / 0.06);
-  --border-strong: oklch(15% 0 0 / 0.12);
-  --accent-fg: oklch(15% 0 0);
-  --neon: oklch(80% 0.22 145);
-  --violet: oklch(68% 0.22 295);
-  --danger: oklch(62% 0.22 25);
-  --success: oklch(70% 0.18 155);
-  --warning: oklch(78% 0.18 75);
-  --glass-bg: oklch(99% 0 0 / 0.55);
-  --glass-border: oklch(15% 0 0 / 0.08);
-  --glass-strong-bg: rgb(255 255 255 / 0.7);
-  --glass-thin-bg: rgb(255 255 255 / 0.45);
-  --card-foreground: var(--foreground);
-  --popover: var(--card);
-  --popover-foreground: var(--foreground);
-  --primary: #0285f7;
-  --primary-foreground: #ffffff;
-  --secondary: var(--card);
-  --secondary-foreground: var(--foreground);
-  --muted: var(--card);
-  --accent: oklch(72% 0.18 195);
-  --accent-foreground: var(--accent-fg);
-  --destructive: var(--danger);
-  --input: var(--border);
-  --ring: var(--border-strong);
-}
+beUI's ThemeToggle uses `next-themes`, so add this file at `app/theme-provider.tsx`:
 
-.dark {
-  --background: #151515;
-  --foreground: oklch(96% 0 0);
-  --card: #1c1c1c;
-  --muted-foreground: oklch(62% 0 0);
-  --border: rgb(255 255 255 / 0.05);
-  --border-strong: rgb(255 255 255 / 0.1);
-  --accent: oklch(80% 0.18 195);
-  --accent-fg: #151515;
-  --glass-bg: rgb(28 28 28 / 0.55);
-  --glass-border: rgb(255 255 255 / 0.08);
-  --glass-strong-bg: rgb(28 28 28 / 0.6);
-  --glass-thin-bg: rgb(21 21 21 / 0.45);
-}
+```tsx
+"use client";
 
-@theme inline {
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
-  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+import { ThemeProvider as NextThemesProvider } from "next-themes";
+import type { ComponentProps } from "react";
 
-  --color-border: var(--border);
-  --color-border-strong: var(--border-strong);
-  --color-neon: var(--neon);
-  --color-violet: var(--violet);
-  --color-success: var(--success);
-  --color-warning: var(--warning);
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-}
-
-@theme {
-  --animate-marquee: marquee 30s linear infinite;
-  --animate-shimmer: shimmer 2.5s linear infinite;
-
-  @keyframes marquee {
-    from { transform: translateX(0); }
-    to { transform: translateX(calc(-100% - var(--gap, 1rem))); }
-  }
-  @keyframes shimmer {
-    from { background-position: 200% 0; }
-    to { background-position: -200% 0; }
-  }
-}
-
-@layer utilities {
-  .scrollbar-hide::-webkit-scrollbar { display: none; }
-  .scrollbar-hide { scrollbar-width: none; }
-
-  .mask-radial-fade {
-    mask-image: radial-gradient(ellipse at center, black 40%, transparent 75%);
-  }
-  .glass {
-    background: var(--glass-bg);
-    backdrop-filter: blur(20px) saturate(160%);
-    border: 1px solid var(--glass-border);
-    box-shadow:
-      0 1px 0 0 rgb(255 255 255 / 0.06) inset,
-      0 24px 60px -24px rgb(0 0 0 / 0.45);
-  }
-}
-
-/* Theme toggle: circular reveal via View Transition API */
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation: none;
-  mix-blend-mode: normal;
+export function ThemeProvider(props: ComponentProps<typeof NextThemesProvider>) {
+  return (
+    <NextThemesProvider
+      attribute="class"
+      defaultTheme="dark"
+      enableSystem
+      enableColorScheme={false}
+      storageKey="crypto_invest_theme"
+      {...props}
+    />
+  );
 }
 ```
 
-## 3. `lib/utils.ts`
+Then wrap your root `app/layout.tsx` (I haven't seen it, so adapt this to yours):
+
+```tsx
+<html lang="en" suppressHydrationWarning>
+  <body>
+    <ThemeProvider>{children}</ThemeProvider>
+  </body>
+</html>
+```
+
+I kept your `crypto_invest_theme` storage key, so existing visitors keep their saved theme. If you have an inline script that sets the theme class, remove it. Also, `data-theme` is no longer set. If other CSS depends on it, switch it to the `.dark` class.
+
+## 3. Files that stay as in my previous message
+
+These are unchanged: `page.tsx`, `logo.tsx`, `dividend-countdown.tsx`, `how-it-works.tsx` and `wallets.tsx`.
+
+In `data.ts`, replace only these three blocks. Everything else there stays the same.
 
 ```ts
-import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
-
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
-```
-
-## 4. `lib/ease.ts`
-
-```ts
-export const EASE_OUT = [0.16, 1, 0.3, 1] as const;
-export const EASE_IN_OUT = [0.77, 0, 0.175, 1] as const;
-export const EASE_DRAWER = [0.32, 0.72, 0, 1] as const;
-export const EASE_OUT_CSS = "cubic-bezier(0.16, 1, 0.3, 1)";
-
-export const SPRING_PRESS = { type: "spring", stiffness: 500, damping: 30, mass: 0.6 } as const;
-export const SPRING_SWAP = { type: "spring", stiffness: 460, damping: 30, mass: 0.55 } as const;
-export const SPRING_PANEL = { type: "spring", stiffness: 420, damping: 40, mass: 0.5 } as const;
-export const SPRING_LAYOUT = { type: "spring", stiffness: 360, damping: 32, mass: 0.6 } as const;
-export const SPRING_MOUSE = { stiffness: 200, damping: 15, mass: 0.3 } as const;
-export const SPRING_GLIDE = { stiffness: 700, damping: 50, mass: 0.5 } as const;
-```
-
-## 5. `app/(public)/_components/data.ts`
-
-```ts
-// app/(public)/_components/data.ts
-import {
-  ArrowLeftRight,
-  BadgeCheck,
-  Banknote,
-  Bot,
-  CandlestickChart,
-  Download,
-  Fingerprint,
-  Headset,
-  KeyRound,
-  Landmark,
-  PiggyBank,
-  SlidersHorizontal,
-  TrendingUp,
-  UserPlus,
-  Users,
-  Wallet,
-  type LucideIcon,
-} from "lucide-react";
-
-/* ---------- Shared class strings ---------- */
-export const SECTION =
-  "mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 mb-24 md:mb-32 lg:mb-40";
-export const CARD = "rounded-3xl border border-border bg-card";
-export const H2 =
-  "text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-tight text-balance text-foreground";
-
-export type IconItem = { icon: LucideIcon; title: string; desc: string };
-
-/* ---------- Hero preview card ---------- */
-export const WALLET_TABS = ["Main", "Investment", "Trading"] as const;
-export type WalletTab = (typeof WALLET_TABS)[number];
-
-export const PNL = [
-  { label: "Today", value: "+1.8%" },
-  { label: "7-Day", value: "+9.4%" },
-  { label: "30-Day", value: "+31.2%" },
-  { label: "All-Time", value: "+86.7%" },
-];
-
-// Demo numbers for the preview card. Edit freely.
+// data.ts — replace WALLET_PREVIEW
 export const WALLET_PREVIEW: Record<
   WalletTab,
-  { value: string; pnl: { label: string; value: string }[] }
+  { value: number; pnl: { label: string; value: string }[] }
 > = {
   Main: {
-    value: "$3,240.00",
+    value: 3240,
     pnl: PNL.map((p) => ({ label: p.label, value: "—" })),
   },
-  Investment: { value: "$12,480.55", pnl: PNL },
+  Investment: { value: 12480.55, pnl: PNL },
   Trading: {
-    value: "$5,120.30",
+    value: 5120.3,
     pnl: [
       { label: "Today", value: "+0.9%" },
       { label: "7-Day", value: "+4.1%" },
@@ -228,528 +79,26 @@ export const WALLET_PREVIEW: Record<
   },
 };
 
-/* ---------- Trust strip ---------- */
+// data.ts — replace METRICS (beUI's NumberTicker takes a real number)
 export const METRICS = [
-  { value: "$10M+", label: "Total assets managed" },
-  { value: "2.5%", label: "Max daily plan return" },
-  { value: "68.4%", label: "AI trading win rate" },
-  { value: "99.98%", label: "Platform uptime" },
-  { value: "50,000+", label: "Active traders" },
+  { value: 10, prefix: "$", suffix: "M+", decimals: 0, label: "Total assets managed" },
+  { value: 2.5, prefix: "", suffix: "%", decimals: 1, label: "Max daily plan return" },
+  { value: 68.4, prefix: "", suffix: "%", decimals: 1, label: "AI trading win rate" },
+  { value: 99.98, prefix: "", suffix: "%", decimals: 2, label: "Platform uptime" },
+  { value: 50000, prefix: "", suffix: "+", decimals: 0, label: "Active traders" },
 ];
-
-/* ---------- Features ---------- */
-export const FEATURES: (IconItem & { cta: string; href: string })[] = [
-  {
-    icon: TrendingUp,
-    title: "Automated Daily Profits",
-    desc: "Plans from 1.7% to 2.5% per day, credited every 24 hours to your Investment Wallet.",
-    cta: "Explore plans",
-    href: "#plans",
-  },
-  {
-    icon: Bot,
-    title: "Quantitative AI Trading",
-    desc: "Momentum, EMA and grid-scalping strategies with automated risk controls.",
-    cta: "Explore AI trading",
-    href: "#trading",
-  },
-  {
-    icon: Wallet,
-    title: "3-Wallet Smart Partitioning",
-    desc: "Separate trading capital and investment principal into distinct vaults.",
-    cta: "Explore wallets",
-    href: "#wallets",
-  },
-  {
-    icon: Users,
-    title: "5% Lifetime Affiliate Program",
-    desc: "Earn 5% on referral profits, milestone cash bonuses and up to $1,000 monthly leaderboard prizes.",
-    cta: "Explore referrals",
-    href: "#referral",
-  },
-  {
-    icon: ArrowLeftRight,
-    title: "Instant Peer-to-Peer Transfers",
-    desc: "Send funds by Email or User ID with instant settlement and a flat $0.10 fee.",
-    cta: "Explore transfers",
-    href: "#wallets",
-  },
-];
-
-/* ---------- Referral ---------- */
-export const REFERRAL_POINTS = [
-  "Claim at 5 referrals for $5.00, or keep going and skip to a bigger payout.",
-  "Counter resets to 0 after every claim, so you can earn unlimited bonuses.",
-  "Targets run from 5 referrals ($5) up to 150 referrals ($180).",
-];
-
-export const REFERRAL_TIERS = [
-  { referrals: 5, bonus: 5 },
-  { referrals: 10, bonus: 10 },
-  { referrals: 15, bonus: 18 },
-  { referrals: 20, bonus: 25 },
-  { referrals: 30, bonus: 40 },
-  { referrals: 50, bonus: 65 },
-  { referrals: 100, bonus: 120 },
-  { referrals: 150, bonus: 180 },
-];
-
-/* ---------- How it works ---------- */
-export const STEPS: IconItem[] = [
-  {
-    icon: UserPlus,
-    title: "Create account",
-    desc: "Sign up in under 60 seconds and enable 2FA.",
-  },
-  {
-    icon: Download,
-    title: "Deposit crypto",
-    desc: "Fund your Main Wallet with USDT or USDC via TRC-20, BEP-20 or ERC-20.",
-  },
-  {
-    icon: SlidersHorizontal,
-    title: "Pick a strategy",
-    desc: "Activate a daily profit plan or AI trading package.",
-  },
-  {
-    icon: Banknote,
-    title: "Collect & withdraw",
-    desc: "Profits credit every 24 hours. Withdraw to your Main Wallet when cycles end.",
-  },
-];
-
-/* ---------- Wallets ---------- */
-export const WALLETS: IconItem[] = [
-  {
-    icon: Landmark,
-    title: "Main Wallet",
-    desc: "Central hub for deposits and withdrawals.",
-  },
-  {
-    icon: PiggyBank,
-    title: "Investment Wallet",
-    desc: "Daily profit growth and reinvestment.",
-  },
-  {
-    icon: CandlestickChart,
-    title: "Trading Wallet",
-    desc: "Dedicated margin for AI strategies and manual orders.",
-  },
-  {
-    icon: ArrowLeftRight,
-    title: "Zero-Fee Transfers",
-    desc: "Move funds between your wallets instantly.",
-  },
-];
-
-/* ---------- Pricing ---------- */
-export type Plan = {
-  name: string;
-  price: string;
-  unit: string;
-  desc: string;
-  cta: string;
-  popular?: boolean;
-};
-
-export const PLANS: Plan[] = [
-  {
-    name: "Starter",
-    price: "1.7%",
-    unit: "/day",
-    desc: "Daily profit plan from $30, credited every 24 hours.",
-    cta: "Start Plan",
-  },
-  {
-    name: "Growth",
-    price: "2.1%",
-    unit: "/day",
-    desc: "Higher daily rate with automatic crediting to your Investment Wallet.",
-    cta: "Start Plan",
-  },
-  {
-    name: "AI Trading",
-    price: "$100",
-    unit: "min",
-    desc: "Algorithmic trading with a 15-day lock and daily P&L updates.",
-    cta: "Activate",
-  },
-  {
-    name: "Elite",
-    price: "2.5%",
-    unit: "/day",
-    desc: "Our top daily profit tier with a live dividend countdown.",
-    cta: "Go Elite",
-    popular: true,
-  },
-];
-
-/* ---------- Security ---------- */
-export const SECURITY: { icon: LucideIcon; title: string; desc: string }[] = [
-  { icon: KeyRound, title: "2FA", desc: "Google Authenticator" },
-  { icon: BadgeCheck, title: "KYC", desc: "4-step verification" },
-  { icon: Fingerprint, title: "IP Tracking", desc: "Login audit trail" },
-  { icon: Headset, title: "24/7", desc: "Ticket support" },
-];
-
-/* ---------- FAQ ---------- */
-export const FAQ = [
-  {
-    q: "Can I claim multiple referral targets simultaneously?",
-    a: "No. Once you claim a target, your counter resets to 0. Claim smaller targets along the way or hold out for higher tier rewards.",
-  },
-  {
-    q: "When are AI trading results credited?",
-    a: "Results are recorded and credited every 24 hours inside your strategy dashboard.",
-  },
-  {
-    q: "Can I cancel my AI Trading Package before 15 days?",
-    a: "No. Funds are deployed in open positions, so capital stays locked for the full 15-day cycle.",
-  },
-  {
-    q: "What is the minimum withdrawal amount?",
-    a: "Once a cycle completes or a bonus is claimed, funds can be withdrawn according to standard platform wallet limits.",
-  },
-];
-
-/* ---------- Footer ---------- */
-export const FOOTER_COLUMNS: Record<string, string[]> = {
-  Products: ["Daily Profit", "AI Trading", "Manual Trading"],
-  Wallets: ["Deposit", "Withdraw", "Transfer", "History"],
-  Community: ["Live Chat", "Announcements", "Referral Leaderboard", "Support"],
-  Legal: ["Privacy", "Terms", "Security"],
-};
 ```
 
-## 6. `app/(public)/_components/ui.tsx` (new, beUI-style primitives)
+The Main and Trading preview numbers are demo values I made up, so edit them.
 
-```tsx
-// app/(public)/_components/ui.tsx
-"use client";
-
-import Link from "next/link";
-import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from "react";
-import {
-  animate,
-  motion,
-  useInView,
-  useMotionTemplate,
-  useMotionValue,
-  useReducedMotion,
-  useSpring,
-  useTransform,
-} from "motion/react";
-import { cn } from "@/lib/utils";
-import { EASE_OUT, SPRING_LAYOUT, SPRING_MOUSE, SPRING_PRESS } from "@/lib/ease";
-
-/* ------------------------------------------------------------------ */
-/* Reveal: fade + rise when scrolled into view                         */
-/* ------------------------------------------------------------------ */
-export function Reveal({
-  children,
-  delay = 0,
-  y = 24,
-  className,
-}: {
-  children: ReactNode;
-  delay?: number;
-  y?: number;
-  className?: string;
-}) {
-  const reduce = useReducedMotion();
-  return (
-    <motion.div
-      className={className}
-      initial={reduce ? false : { opacity: 0, y }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-60px" }}
-      transition={{ duration: 0.6, delay, ease: EASE_OUT }}
-    >
-      {children}
-    </motion.div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* ButtonLink: spring-pressed pill button                              */
-/* ------------------------------------------------------------------ */
-const MotionLink = motion.create(Link);
-
-export function ButtonLink({
-  href,
-  variant = "primary",
-  size = "md",
-  className,
-  children,
-}: {
-  href: string;
-  variant?: "primary" | "ghost";
-  size?: "md" | "lg";
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <MotionLink
-      href={href}
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.96 }}
-      transition={SPRING_PRESS}
-      className={cn(
-        "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full font-medium outline-none transition-colors",
-        "focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-        size === "md" ? "h-11 px-6 text-sm" : "h-12 px-8 text-base",
-        variant === "primary"
-          ? "bg-primary text-primary-foreground shadow-[0_8px_30px_-10px_var(--primary)] hover:brightness-110"
-          : "border border-border-strong text-foreground hover:bg-foreground/5",
-        className,
-      )}
-    >
-      {children}
-    </MotionLink>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* TiltCard: 3D tilt + cursor glare (mouse only, skipped on touch)     */
-/* ------------------------------------------------------------------ */
-export function TiltCard({
-  children,
-  className,
-  max = 6,
-}: {
-  children: ReactNode;
-  className?: string;
-  max?: number;
-}) {
-  const reduce = useReducedMotion();
-  const ref = useRef<HTMLDivElement>(null);
-  const px = useMotionValue(0.5);
-  const py = useMotionValue(0.5);
-  const sx = useSpring(px, SPRING_MOUSE);
-  const sy = useSpring(py, SPRING_MOUSE);
-  const rotateY = useTransform(sx, [0, 1], [-max, max]);
-  const rotateX = useTransform(sy, [0, 1], [max, -max]);
-  const gx = useTransform(sx, (v) => `${v * 100}%`);
-  const gy = useTransform(sy, (v) => `${v * 100}%`);
-  const glare = useMotionTemplate`radial-gradient(360px circle at ${gx} ${gy}, rgb(255 255 255 / 0.09), transparent 60%)`;
-  const glareOpacity = useSpring(0, { stiffness: 200, damping: 25 });
-
-  const onMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.pointerType !== "mouse" || reduce || !ref.current) return;
-    const r = ref.current.getBoundingClientRect();
-    px.set((e.clientX - r.left) / r.width);
-    py.set((e.clientY - r.top) / r.height);
-    glareOpacity.set(1);
-  };
-  const onLeave = () => {
-    px.set(0.5);
-    py.set(0.5);
-    glareOpacity.set(0);
-  };
-
-  return (
-    <div className="h-full [perspective:1000px]">
-      <motion.div
-        ref={ref}
-        onPointerMove={onMove}
-        onPointerLeave={onLeave}
-        style={reduce ? undefined : { rotateX, rotateY, transformStyle: "preserve-3d" }}
-        className={cn("relative h-full", className)}
-      >
-        {children}
-        {!reduce && (
-          <motion.div
-            aria-hidden
-            style={{ background: glare, opacity: glareOpacity }}
-            className="pointer-events-none absolute inset-0 rounded-[inherit]"
-          />
-        )}
-      </motion.div>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* NumberTicker: count-up for values like "$10M+", "99.98%", "50,000+" */
-/* ------------------------------------------------------------------ */
-function parseNumber(value: string) {
-  const m = value.match(/^([^\d]*)(\d[\d,]*\.?\d*)(.*)$/);
-  if (!m) return null;
-  const [, prefix, num, suffix] = m;
-  return {
-    prefix,
-    suffix,
-    target: parseFloat(num.replace(/,/g, "")),
-    decimals: num.includes(".") ? num.split(".")[1].length : 0,
-    grouped: num.includes(","),
-  };
-}
-
-export function NumberTicker({
-  value,
-  className,
-}: {
-  value: string;
-  className?: string;
-}) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const inView = useInView(ref, { once: true, margin: "-40px" });
-  const reduce = useReducedMotion();
-  const [text, setText] = useState(value);
-
-  useEffect(() => {
-    const p = parseNumber(value);
-    if (!p || !inView || reduce) return;
-    const controls = animate(0, p.target, {
-      duration: 1.6,
-      ease: EASE_OUT,
-      onUpdate: (v) =>
-        setText(
-          p.prefix +
-            v.toLocaleString("en-US", {
-              minimumFractionDigits: p.decimals,
-              maximumFractionDigits: p.decimals,
-              useGrouping: p.grouped,
-            }) +
-            p.suffix,
-        ),
-      onComplete: () => setText(value),
-    });
-    return () => controls.stop();
-  }, [inView, reduce, value]);
-
-  return (
-    <span ref={ref} className={cn("tabular-nums", className)}>
-      {text}
-    </span>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* PillTabs: spring layoutId indicator                                 */
-/* ------------------------------------------------------------------ */
-export function PillTabs<T extends string>({
-  tabs,
-  value,
-  onChange,
-  className,
-}: {
-  tabs: readonly T[];
-  value: T;
-  onChange: (t: T) => void;
-  className?: string;
-}) {
-  const id = useId();
-  return (
-    <div
-      role="tablist"
-      className={cn(
-        "relative inline-flex rounded-full border border-border bg-background/60 p-1",
-        className,
-      )}
-    >
-      {tabs.map((t) => {
-        const active = t === value;
-        return (
-          <button
-            key={t}
-            role="tab"
-            type="button"
-            aria-selected={active}
-            onClick={() => onChange(t)}
-            className="relative rounded-full px-3 py-1.5 text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-primary/60 sm:px-4"
-          >
-            {active && (
-              <motion.span
-                layoutId={id}
-                transition={SPRING_LAYOUT}
-                className="absolute inset-0 rounded-full bg-primary"
-              />
-            )}
-            <span
-              className={cn(
-                "relative z-10 transition-colors",
-                active ? "text-primary-foreground" : "text-muted-foreground",
-              )}
-            >
-              {t}
-            </span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* TextReveal: word-by-word spring reveal for the hero heading         */
-/* ------------------------------------------------------------------ */
-export function TextReveal({
-  text,
-  className,
-}: {
-  text: string;
-  className?: string;
-}) {
-  const reduce = useReducedMotion();
-  const words = text.split(" ");
-  return (
-    <h1 aria-label={text} className={className}>
-      {words.map((w, i) => (
-        <Fragment key={i}>
-          <span
-            aria-hidden
-            className="-mb-[0.12em] inline-block overflow-hidden pb-[0.12em] align-bottom"
-          >
-            <motion.span
-              className="inline-block"
-              initial={reduce ? false : { y: "110%", opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ type: "spring", duration: 0.8, bounce: 0.2, delay: 0.05 * i }}
-            >
-              {w}
-            </motion.span>
-          </span>{" "}
-        </Fragment>
-      ))}
-    </h1>
-  );
-}
-```
-
-## 7. Small shared files
-
-**`logo.tsx`**
-
-```tsx
-// app/(public)/_components/logo.tsx
-import Link from "next/link";
-import { cn } from "@/lib/utils";
-
-export function Logo({ className }: { className?: string }) {
-  return (
-    <Link
-      href="/"
-      className={cn(
-        "inline-flex items-center gap-2 text-lg font-semibold tracking-tight text-foreground",
-        className,
-      )}
-    >
-      <span className="grid h-6 w-6 place-items-center rounded-lg bg-primary text-[13px] font-bold text-primary-foreground">
-        Q
-      </span>
-      Qouantex
-    </Link>
-  );
-}
-```
+## 4. Rewritten files
 
 **`section-heading.tsx`**
 
 ```tsx
 // app/(public)/_components/section-heading.tsx
+import { ScrollReveal } from "@/components/motion/scroll-reveal";
 import { H2 } from "./data";
-import { Reveal } from "./ui";
 
 export function SectionHeading({
   title,
@@ -761,7 +110,10 @@ export function SectionHeading({
   eyebrow?: string;
 }) {
   return (
-    <Reveal className="mx-auto mb-10 max-w-2xl text-center md:mb-14">
+    <ScrollReveal
+      amount={0.2}
+      className="mx-auto mb-10 max-w-2xl text-center md:mb-14"
+    >
       {eyebrow && (
         <p className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
           {eyebrow}
@@ -773,7 +125,7 @@ export function SectionHeading({
           {subtitle}
         </p>
       )}
-    </Reveal>
+    </ScrollReveal>
   );
 }
 ```
@@ -782,8 +134,9 @@ export function SectionHeading({
 
 ```tsx
 // app/(public)/_components/icon-card.tsx
-import { CARD, type IconItem } from "./data";
-import { Reveal, TiltCard } from "./ui";
+import { ScrollReveal } from "@/components/motion/scroll-reveal";
+import { TiltCard } from "@/components/motion/tilt-card";
+import type { IconItem } from "./data";
 
 export function IconCard({
   icon: Icon,
@@ -793,8 +146,11 @@ export function IconCard({
   number,
 }: IconItem & { index?: number; number?: string }) {
   return (
-    <Reveal delay={index * 0.08} className="h-full">
-      <TiltCard className={`${CARD} group flex flex-col p-6`} max={5}>
+    <ScrollReveal delay={index * 0.08} className="h-full">
+      <TiltCard
+        max={6}
+        className="group h-full rounded-3xl border border-border bg-card p-6"
+      >
         {number && (
           <span className="absolute right-5 top-4 text-5xl font-semibold tracking-tighter text-foreground/[0.06]">
             {number}
@@ -808,56 +164,10 @@ export function IconCard({
         </h3>
         <p className="text-sm leading-relaxed text-muted-foreground">{desc}</p>
       </TiltCard>
-    </Reveal>
+    </ScrollReveal>
   );
 }
 ```
-
-## 8. `page.tsx`
-
-```tsx
-// app/(public)/page.tsx
-import type { Metadata } from "next";
-import { Navbar } from "./_components/navbar";
-import { Hero } from "./_components/hero";
-import { Metrics } from "./_components/metrics";
-import { Features } from "./_components/features";
-import { Referral } from "./_components/referral";
-import { AiTrading } from "./_components/ai-trading";
-import { HowItWorks } from "./_components/how-it-works";
-import { Wallets } from "./_components/wallets";
-import { Pricing } from "./_components/pricing";
-import { Security } from "./_components/security";
-import { Faq } from "./_components/faq";
-import { Footer } from "./_components/footer";
-
-export const metadata: Metadata = {
-  title: "Qouantex - Crypto Wealth & Trading Ecosystem",
-};
-
-export default function HomePage() {
-  return (
-    <div className="relative min-h-screen overflow-x-clip bg-background font-sans text-foreground antialiased">
-      <Navbar />
-      <main className="pt-24 sm:pt-32">
-        <Hero />
-        <Metrics />
-        <Features />
-        <Referral />
-        <AiTrading />
-        <HowItWorks />
-        <Wallets />
-        <Pricing />
-        <Security />
-        <Faq />
-      </main>
-      <Footer />
-    </div>
-  );
-}
-```
-
-## 9. Navbar and theme toggle
 
 **`navbar.tsx`**
 
@@ -868,10 +178,10 @@ export default function HomePage() {
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Menu, X } from "lucide-react";
-import { Logo } from "./logo";
-import { ThemeToggle } from "./theme-toggle";
-import { ButtonLink } from "./ui";
+import { Button, ButtonLink } from "@/components/motion/button";
+import { ThemeToggle } from "@/components/motion/theme-toggle";
 import { SPRING_PANEL } from "@/lib/ease";
+import { Logo } from "./logo";
 
 const LINKS = [
   { label: "Features", href: "#features" },
@@ -908,19 +218,25 @@ export function Navbar() {
           </div>
 
           <div className="flex items-center gap-1">
-            <ThemeToggle />
+            <ThemeToggle
+              variant="circle"
+              start="top-right"
+              className="h-10 w-10 rounded-full text-foreground transition-colors hover:bg-foreground/5"
+              iconClassName="h-[18px] w-[18px]"
+            />
             <ButtonLink href="/signup" className="hidden sm:inline-flex">
               Get Started
             </ButtonLink>
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="icon"
               aria-label={open ? "Close menu" : "Open menu"}
               aria-expanded={open}
               onClick={() => setOpen((o) => !o)}
-              className="grid h-10 w-10 place-items-center rounded-full text-foreground transition-colors hover:bg-foreground/5 md:hidden"
+              className="h-10 w-10 rounded-full md:hidden"
             >
               {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -958,120 +274,20 @@ export function Navbar() {
 }
 ```
 
-**`theme-toggle.tsx`**
-
-```tsx
-// app/(public)/_components/theme-toggle.tsx
-"use client";
-
-import { useSyncExternalStore } from "react";
-import { AnimatePresence, motion } from "motion/react";
-import { Moon, Sun } from "lucide-react";
-
-const STORAGE_KEY = "crypto_invest_theme";
-
-function subscribe(onChange: () => void) {
-  const observer = new MutationObserver(onChange);
-  observer.observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ["class"],
-  });
-  return () => observer.disconnect();
-}
-
-const getSnapshot = () => document.documentElement.classList.contains("dark");
-const getServerSnapshot = () => true; // app defaults to dark
-
-type StartVT = (cb: () => void) => { ready: Promise<void> };
-
-export function ThemeToggle() {
-  const isDark = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-
-  const apply = (next: "light" | "dark") => {
-    const root = document.documentElement;
-    root.classList.remove("light", "dark");
-    root.classList.add(next);
-    root.setAttribute("data-theme", next);
-    root.style.colorScheme = next;
-    try {
-      localStorage.setItem(STORAGE_KEY, next);
-    } catch {
-      /* storage unavailable */
-    }
-  };
-
-  const toggle = async (e: React.MouseEvent<HTMLButtonElement>) => {
-    const next = isDark ? "light" : "dark";
-    const start = (
-      document as unknown as { startViewTransition?: StartVT }
-    ).startViewTransition?.bind(document);
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    if (!start || reduce) {
-      apply(next);
-      return;
-    }
-
-    const r = e.currentTarget.getBoundingClientRect();
-    const x = r.left + r.width / 2;
-    const y = r.top + r.height / 2;
-    const radius = Math.hypot(
-      Math.max(x, window.innerWidth - x),
-      Math.max(y, window.innerHeight - y),
-    );
-
-    const transition = start(() => apply(next));
-    await transition.ready;
-    document.documentElement.animate(
-      {
-        clipPath: [
-          `circle(0px at ${x}px ${y}px)`,
-          `circle(${radius}px at ${x}px ${y}px)`,
-        ],
-      },
-      {
-        duration: 600,
-        easing: "cubic-bezier(0.16, 1, 0.3, 1)",
-        pseudoElement: "::view-transition-new(root)",
-      },
-    );
-  };
-
-  return (
-    <button
-      type="button"
-      onClick={toggle}
-      aria-label="Toggle light/dark mode"
-      className="grid h-10 w-10 place-items-center rounded-full text-foreground transition-colors hover:bg-foreground/5"
-    >
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.span
-          key={isDark ? "sun" : "moon"}
-          initial={{ rotate: -90, opacity: 0, scale: 0.6 }}
-          animate={{ rotate: 0, opacity: 1, scale: 1 }}
-          exit={{ rotate: 90, opacity: 0, scale: 0.6 }}
-          transition={{ duration: 0.2 }}
-          className="grid place-items-center"
-        >
-          {isDark ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
-        </motion.span>
-      </AnimatePresence>
-    </button>
-  );
-}
-```
-
-## 10. Hero
+Add `useState` to the React import in that file, like this: `import { useEffect, useState } from "react";`.
 
 **`hero.tsx`**
 
 ```tsx
 // app/(public)/_components/hero.tsx
 import { ArrowRight } from "lucide-react";
+import { ButtonLink } from "@/components/motion/button";
+import { ScrollReveal } from "@/components/motion/scroll-reveal";
+import { TextReveal } from "@/components/motion/text-reveal";
+import { TextShimmer } from "@/components/motion/text-shimmer";
+import { cn } from "@/lib/utils";
 import { SECTION } from "./data";
 import { HeroPreview } from "./hero-preview";
-import { ButtonLink, Reveal, TextReveal } from "./ui";
-import { cn } from "@/lib/utils";
 
 export function Hero() {
   return (
@@ -1084,57 +300,59 @@ export function Hero() {
         className="pointer-events-none absolute left-1/2 top-0 -z-10 h-[420px] w-[min(900px,100%)] -translate-x-1/2 rounded-full bg-primary/20 blur-[120px] mask-radial-fade"
       />
 
-      {/* Announcement pill with shimmer text */}
-      <Reveal className="mb-6 sm:mb-8">
+      <ScrollReveal className="mb-6 sm:mb-8">
         <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card/70 py-1.5 pl-1.5 pr-3 backdrop-blur sm:pr-4">
           <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary-foreground">
             New
           </span>
-          <span className="animate-shimmer bg-[linear-gradient(110deg,var(--muted-foreground)_35%,var(--foreground)_50%,var(--muted-foreground)_65%)] bg-[length:200%_100%] bg-clip-text text-xs font-medium text-transparent sm:text-sm">
+          <TextShimmer className="text-xs font-medium sm:text-sm">
             Referral Milestone Bonuses are live
-          </span>
+          </TextShimmer>
           <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
         </span>
-      </Reveal>
+      </ScrollReveal>
 
       <TextReveal
+        as="h1"
         text="The all-in-one crypto wealth & trading ecosystem"
-        className="mb-5 max-w-4xl text-4xl font-semibold leading-[1.05] tracking-tight text-balance text-foreground sm:mb-6 sm:text-5xl md:text-6xl lg:text-7xl"
+        stagger={0.06}
+        blur={8}
+        className="mx-auto mb-5 max-w-4xl text-4xl font-semibold leading-[1.05] tracking-tight text-balance text-foreground sm:mb-6 sm:text-5xl md:text-6xl lg:text-7xl"
       />
 
-      <Reveal delay={0.25}>
+      <ScrollReveal delay={0.25}>
         <p className="mx-auto mb-8 max-w-xl text-base text-muted-foreground text-pretty sm:mb-10 sm:text-lg">
           Automated daily profit plans and professional AI trading, organized in
           a segregated 3-wallet system with 2FA, KYC and login tracking built
           in.
         </p>
-      </Reveal>
+      </ScrollReveal>
 
-      <Reveal delay={0.35} className="w-full sm:w-auto">
+      <ScrollReveal delay={0.35} className="w-full sm:w-auto">
         <div className="mb-14 flex w-full flex-col gap-3 sm:mb-20 sm:w-auto sm:flex-row">
-          <ButtonLink href="/signin" size="lg" className="w-full sm:w-auto">
+          <ButtonLink href="/signin" size="lg" className="w-full sm:w-auto sm:px-8">
             Dashboard
           </ButtonLink>
           <ButtonLink
             href="/signup"
-            variant="ghost"
+            variant="outline"
             size="lg"
-            className="w-full sm:w-auto"
+            className="w-full sm:w-auto sm:px-8"
           >
             Get Started
           </ButtonLink>
         </div>
-      </Reveal>
+      </ScrollReveal>
 
-      <Reveal delay={0.45} y={40} className="w-full max-w-5xl">
+      <ScrollReveal delay={0.45} y={40} amount={0.1} className="w-full max-w-5xl">
         <HeroPreview />
-      </Reveal>
+      </ScrollReveal>
     </section>
   );
 }
 ```
 
-**`hero-preview.tsx`** (new)
+**`hero-preview.tsx`**
 
 ```tsx
 // app/(public)/_components/hero-preview.tsx
@@ -1143,10 +361,15 @@ export function Hero() {
 import { useState } from "react";
 import { motion } from "motion/react";
 import { Clock } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/motion/tabs";
+import { NumberTicker } from "@/components/motion/number-ticker";
+import { TiltCard } from "@/components/motion/tilt-card";
+import { cn } from "@/lib/utils";
 import { DividendCountdown } from "./dividend-countdown";
 import { WALLET_PREVIEW, WALLET_TABS, type WalletTab } from "./data";
-import { NumberTicker, PillTabs, TiltCard } from "./ui";
-import { cn } from "@/lib/utils";
+
+const money = (n: number) =>
+  n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export function HeroPreview() {
   const [tab, setTab] = useState<WalletTab>("Investment");
@@ -1154,7 +377,7 @@ export function HeroPreview() {
 
   return (
     <TiltCard
-      max={2.5}
+      max={4}
       className="rounded-[28px] border border-border bg-card/70 p-2 shadow-2xl shadow-black/20 sm:p-3"
     >
       <div className="rounded-3xl border border-border bg-background/60 p-4 text-left sm:p-6 lg:p-8">
@@ -1165,12 +388,26 @@ export function HeroPreview() {
               Portfolio Value
             </div>
             <NumberTicker
-              key={tab}
               value={data.value}
-              className="block text-3xl font-semibold tracking-tight sm:text-4xl"
+              decimals={2}
+              prefix="$"
+              format={money}
+              className="text-3xl font-semibold tracking-tight sm:text-4xl"
             />
           </div>
-          <PillTabs tabs={WALLET_TABS} value={tab} onChange={setTab} />
+          <Tabs
+            variant="pill"
+            value={tab}
+            onValueChange={(v) => setTab(v as WalletTab)}
+          >
+            <TabsList>
+              {WALLET_TABS.map((t) => (
+                <TabsTrigger key={t} value={t}>
+                  {t}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
         </div>
 
         {/* P&L */}
@@ -1230,78 +467,59 @@ export function HeroPreview() {
 }
 ```
 
-**`dividend-countdown.tsx`**
-
-```tsx
-// app/(public)/_components/dividend-countdown.tsx
-"use client";
-
-import { useEffect, useState } from "react";
-
-const pad = (n: number) => String(n).padStart(2, "0");
-const secondsLeft = () => 86400 - (Math.floor(Date.now() / 1000) % 86400);
-
-export function DividendCountdown() {
-  const [s, setS] = useState<number | null>(null);
-
-  useEffect(() => {
-    const id = setInterval(() => setS(secondsLeft()), 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  const label =
-    s === null
-      ? "--:--:--"
-      : [Math.floor(s / 3600), Math.floor(s / 60) % 60, s % 60]
-          .map(pad)
-          .join(":");
-
-  return (
-    <div className="font-mono text-xs tabular-nums text-muted-foreground">
-      {label}
-    </div>
-  );
-}
-```
-
-## 11. Metrics
+**`metrics.tsx`**
 
 ```tsx
 // app/(public)/_components/metrics.tsx
-import { METRICS, SECTION } from "./data";
-import { NumberTicker, Reveal } from "./ui";
+"use client";
+
+import { Card } from "@/components/motion/card";
+import { NumberTicker } from "@/components/motion/number-ticker";
+import { ScrollReveal } from "@/components/motion/scroll-reveal";
 import { cn } from "@/lib/utils";
+import { METRICS, SECTION } from "./data";
 
 export function Metrics() {
   return (
     <section className={SECTION}>
-      <Reveal>
+      <ScrollReveal>
         <p className="mb-6 text-center text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground sm:mb-8">
           The platform at a glance
         </p>
-      </Reveal>
+      </ScrollReveal>
+
       {/* 2 cols mobile, 3+2 tablet, 5 desktop */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-6 sm:gap-4 lg:grid-cols-10">
         {METRICS.map((m, i) => (
-          <Reveal
+          <ScrollReveal
             key={m.label}
             delay={i * 0.06}
+            amount={0.2}
             className={cn(
               "lg:col-span-2",
               i < 3 ? "sm:col-span-2" : "sm:col-span-3",
               i === METRICS.length - 1 && "col-span-2",
             )}
           >
-            <div className="flex h-full flex-col items-center justify-center rounded-3xl border border-border bg-card px-4 py-6 text-center sm:py-8">
+            <Card className="h-full items-center justify-center gap-1.5 bg-card px-4 py-6 text-center sm:py-8">
               <NumberTicker
                 value={m.value}
-                className="text-3xl font-semibold tracking-tight sm:text-4xl"
+                decimals={m.decimals}
+                prefix={m.prefix}
+                suffix={m.suffix}
+                format={(n) =>
+                  n.toLocaleString("en-US", {
+                    minimumFractionDigits: m.decimals,
+                    maximumFractionDigits: m.decimals,
+                  })
+                }
+                className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl"
               />
-              <div className="mt-1.5 text-xs text-muted-foreground sm:text-sm">
+              <div className="text-xs text-muted-foreground sm:text-sm">
                 {m.label}
               </div>
-            </div>
-          </Reveal>
+            </Card>
+          </ScrollReveal>
         ))}
       </div>
     </section>
@@ -1309,15 +527,16 @@ export function Metrics() {
 }
 ```
 
-## 12. Features
+**`features.tsx`**
 
 ```tsx
 // app/(public)/_components/features.tsx
 import { ArrowRight } from "lucide-react";
-import { CARD, FEATURES, SECTION } from "./data";
-import { SectionHeading } from "./section-heading";
-import { Reveal, TiltCard } from "./ui";
+import { ScrollReveal } from "@/components/motion/scroll-reveal";
+import { TiltCard } from "@/components/motion/tilt-card";
 import { cn } from "@/lib/utils";
+import { FEATURES, SECTION } from "./data";
+import { SectionHeading } from "./section-heading";
 
 export function Features() {
   return (
@@ -1331,12 +550,16 @@ export function Features() {
         {FEATURES.map((f, i) => {
           const Icon = f.icon;
           return (
-            <Reveal
+            <ScrollReveal
               key={f.title}
               delay={(i % 3) * 0.08}
+              amount={0.15}
               className={cn("h-full", i === 0 && "md:col-span-2 lg:col-span-2")}
             >
-              <TiltCard className={cn(CARD, "group flex flex-col p-5 sm:p-6")} max={4}>
+              <TiltCard
+                max={5}
+                className="group flex h-full flex-col rounded-3xl border border-border bg-card p-5 sm:p-6"
+              >
                 <div className="relative mb-6 grid h-32 place-items-center overflow-hidden rounded-2xl border border-border bg-background/60 sm:h-40">
                   <div
                     aria-hidden
@@ -1362,7 +585,7 @@ export function Features() {
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </a>
               </TiltCard>
-            </Reveal>
+            </ScrollReveal>
           );
         })}
       </div>
@@ -1371,7 +594,7 @@ export function Features() {
 }
 ```
 
-## 13. Referral
+**`referral.tsx`**
 
 ```tsx
 // app/(public)/_components/referral.tsx
@@ -1379,9 +602,10 @@ export function Features() {
 
 import { motion } from "motion/react";
 import { ArrowRight, CheckCircle2, Gift } from "lucide-react";
+import { Card } from "@/components/motion/card";
+import { ScrollReveal } from "@/components/motion/scroll-reveal";
+import { EASE_OUT } from "@/lib/ease";
 import { REFERRAL_POINTS, REFERRAL_TIERS, SECTION } from "./data";
-import { Reveal } from "./ui";
-import { EASE_OUT, SPRING_PRESS } from "@/lib/ease";
 
 export function Referral() {
   return (
@@ -1390,7 +614,7 @@ export function Referral() {
       className={`${SECTION} grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-12`}
     >
       {/* Copy */}
-      <Reveal className="flex flex-col gap-5 sm:gap-6 lg:col-span-5">
+      <ScrollReveal amount={0.15} className="flex flex-col gap-5 sm:gap-6 lg:col-span-5">
         <span className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
           Referral Milestone Bonus System
         </span>
@@ -1410,11 +634,11 @@ export function Referral() {
             </li>
           ))}
         </ul>
-      </Reveal>
+      </ScrollReveal>
 
       {/* Targets card */}
-      <Reveal delay={0.1} className="lg:col-span-7">
-        <div className="rounded-[28px] border border-border bg-card p-3 sm:p-5">
+      <ScrollReveal delay={0.1} amount={0.1} className="lg:col-span-7">
+        <Card className="gap-0 rounded-[28px] bg-card p-3 sm:p-5">
           <div className="rounded-3xl border border-border bg-background/60 p-4 sm:p-6">
             <div className="mb-4 text-xs font-medium uppercase tracking-widest text-muted-foreground">
               Referral Targets &amp; Cash Rewards
@@ -1422,11 +646,9 @@ export function Referral() {
 
             <div className="mb-6 grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3">
               {REFERRAL_TIERS.map((t) => (
-                <motion.div
+                <div
                   key={t.referrals}
-                  whileHover={{ y: -3, scale: 1.03 }}
-                  transition={SPRING_PRESS}
-                  className="rounded-2xl border border-border bg-card p-3 text-center"
+                  className="rounded-2xl border border-border bg-card p-3 text-center transition-colors hover:border-border-strong"
                 >
                   <div className="text-xs text-muted-foreground">
                     {t.referrals} Referrals
@@ -1434,11 +656,10 @@ export function Referral() {
                   <div className="text-lg font-semibold tabular-nums">
                     ${t.bonus}.00
                   </div>
-                </motion.div>
+                </div>
               ))}
             </div>
 
-            {/* Flow */}
             <div className="mb-6 flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-card p-3 font-mono text-xs text-muted-foreground sm:p-4">
               <span>0 Referrals</span>
               <ArrowRight className="h-3.5 w-3.5" />
@@ -1452,7 +673,6 @@ export function Referral() {
               <span>Counter resets to 0</span>
             </div>
 
-            {/* Progress */}
             <div>
               <div className="mb-2 flex justify-between text-xs text-muted-foreground">
                 <span>Progress to 10 referrals</span>
@@ -1479,66 +699,39 @@ export function Referral() {
               </div>
             </div>
           </div>
-        </div>
-      </Reveal>
+        </Card>
+      </ScrollReveal>
     </section>
   );
 }
 ```
 
-## 14. AI Trading
+**`ai-trading.tsx`** (uses beUI's real Code Block)
 
 ```tsx
 // app/(public)/_components/ai-trading.tsx
-"use client";
-
-import type { ReactNode } from "react";
-import { motion } from "motion/react";
 import { ArrowRight } from "lucide-react";
+import { CodeBlock } from "@/components/agents/code-block";
+import { ScrollReveal } from "@/components/motion/scroll-reveal";
 import { SECTION } from "./data";
-import { Reveal } from "./ui";
-import { EASE_OUT } from "@/lib/ease";
 
 const DAYS = [
-  { day: 1, text: "+$2.50 Profit", loss: false },
-  { day: 2, text: "+$1.20 Profit", loss: false },
-  { day: 3, text: "-$0.80 Loss", loss: true },
-  { day: 4, text: "+$3.10 Profit", loss: false },
-  { day: 5, text: "+$1.70 Profit", loss: false },
+  { day: 1, text: "+$2.50 Profit" },
+  { day: 2, text: "+$1.20 Profit" },
+  { day: 3, text: "-$0.80 Loss" },
+  { day: 4, text: "+$3.10 Profit" },
+  { day: 5, text: "+$1.70 Profit" },
 ];
 
 const CHIPS = ["From $100", "15-day strategy lock", "Daily P&L updates"];
 
-const LINES: ReactNode[] = [
-  <>
-    <span className="text-violet">package</span>
-    {" = AI_Trading(min="}
-    <span className="text-success">{'"$100.00"'}</span>
-    {", lock="}
-    <span className="text-success">{'"15 days"'}</span>
-    {")"}
-  </>,
+const CODE = [
+  'package = AI_Trading(min="$100.00", lock="15 days")',
   "",
-  ...DAYS.map((d) => (
-    <>
-      <span className="text-muted-foreground">{`Day ${d.day}:  `}</span>
-      <span className={d.loss ? "text-destructive" : "text-success"}>{d.text}</span>
-    </>
-  )),
+  ...DAYS.map((d) => `Day ${d.day}:  ${d.text}`),
   "",
-  <span className="text-muted-foreground">
-    # Day 15 -&gt; principal + net P&amp;L unlocked
-  </span>,
-];
-
-const container = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.07, delayChildren: 0.2 } },
-};
-const line = {
-  hidden: { opacity: 0, x: -8 },
-  show: { opacity: 1, x: 0, transition: { duration: 0.35, ease: EASE_OUT } },
-};
+  "# Day 15 -> principal + net P&L unlocked",
+].join("\n");
 
 export function AiTrading() {
   return (
@@ -1546,47 +739,23 @@ export function AiTrading() {
       id="trading"
       className={`${SECTION} grid grid-cols-1 items-center gap-10 lg:grid-cols-2 lg:gap-14`}
     >
-      {/* Code window */}
-      <Reveal className="order-2 lg:order-1">
-        <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-2xl shadow-black/10">
-          <div className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-5">
-            <div className="flex gap-2" aria-hidden>
-              <span className="h-3 w-3 rounded-full bg-border-strong" />
-              <span className="h-3 w-3 rounded-full bg-border-strong" />
-              <span className="h-3 w-3 rounded-full bg-border-strong" />
-            </div>
-            <span className="flex items-center gap-2 font-mono text-xs text-muted-foreground">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-success" />
-              strategy.py
-            </span>
-          </div>
-          <motion.pre
-            variants={container}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: "-60px" }}
-            className="overflow-x-auto p-4 font-mono text-xs leading-7 text-foreground/85 sm:p-6 sm:text-sm"
-          >
-            <code className="block">
-              {LINES.map((l, i) => (
-                <motion.div
-                  key={i}
-                  variants={line}
-                  className="flex whitespace-pre-wrap break-words"
-                >
-                  <span className="w-6 shrink-0 select-none text-muted-foreground/50">
-                    {i + 1}
-                  </span>
-                  <span>{l || " "}</span>
-                </motion.div>
-              ))}
-            </code>
-          </motion.pre>
-        </div>
-      </Reveal>
+      <ScrollReveal amount={0.15} className="order-2 min-w-0 lg:order-1">
+        <CodeBlock
+          code={CODE}
+          language="bash"
+          filename="strategy"
+          showLineNumbers
+          copyable={false}
+          wrap
+          maxHeight={340}
+        />
+      </ScrollReveal>
 
-      {/* Copy */}
-      <Reveal delay={0.1} className="order-1 flex flex-col gap-5 sm:gap-6 lg:order-2">
+      <ScrollReveal
+        delay={0.1}
+        amount={0.15}
+        className="order-1 flex flex-col gap-5 sm:gap-6 lg:order-2"
+      >
         <span className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
           AI Trading
         </span>
@@ -1615,78 +784,23 @@ export function AiTrading() {
           View AI strategies
           <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
         </a>
-      </Reveal>
+      </ScrollReveal>
     </section>
   );
 }
 ```
 
-## 15. How it works and Wallets
+beUI's CodeBlock highlights only `bash | diff | json | text | tsx | typescript`. I used `bash` so the string and `#` comment are colored. The profit and loss coloring from the original is gone.
 
-**`how-it-works.tsx`**
-
-```tsx
-// app/(public)/_components/how-it-works.tsx
-import { SECTION, STEPS } from "./data";
-import { IconCard } from "./icon-card";
-import { SectionHeading } from "./section-heading";
-
-export function HowItWorks() {
-  return (
-    <section id="how-it-works" className={SECTION}>
-      <SectionHeading
-        eyebrow="Getting started"
-        title="How it works"
-        subtitle="From sign-up to withdrawal in four steps."
-      />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
-        {STEPS.map((s, i) => (
-          <IconCard key={s.title} {...s} index={i} number={`0${i + 1}`} />
-        ))}
-      </div>
-    </section>
-  );
-}
-```
-
-**`wallets.tsx`**
-
-```tsx
-// app/(public)/_components/wallets.tsx
-import { SECTION, WALLETS } from "./data";
-import { IconCard } from "./icon-card";
-import { SectionHeading } from "./section-heading";
-
-export function Wallets() {
-  return (
-    <section id="wallets" className={SECTION}>
-      <SectionHeading
-        eyebrow="Wallets"
-        title="Three wallets. Total clarity."
-        subtitle="Trading risk never bleeds into your long-term investment. Internal transfers are zero-fee."
-      />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
-        {WALLETS.map((w, i) => (
-          <IconCard key={w.title} {...w} index={i} />
-        ))}
-      </div>
-    </section>
-  );
-}
-```
-
-## 16. Pricing
+**`pricing.tsx`**
 
 ```tsx
 // app/(public)/_components/pricing.tsx
-"use client";
-
-import { motion } from "motion/react";
-import { CARD, PLANS, SECTION } from "./data";
+import { ButtonLink } from "@/components/motion/button";
+import { Card } from "@/components/motion/card";
+import { ScrollReveal } from "@/components/motion/scroll-reveal";
+import { PLANS, SECTION } from "./data";
 import { SectionHeading } from "./section-heading";
-import { ButtonLink, Reveal } from "./ui";
-import { SPRING_PRESS } from "@/lib/ease";
-import { cn } from "@/lib/utils";
 
 export function Pricing() {
   return (
@@ -1696,18 +810,12 @@ export function Pricing() {
         title="Choose your strategy"
         subtitle="Daily profit tiers and AI trading. Start from $30."
       />
-      <div className="grid grid-cols-1 items-stretch gap-5 pt-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-5">
+      <div className="grid grid-cols-1 items-stretch gap-5 pt-3 sm:grid-cols-2 lg:grid-cols-4">
         {PLANS.map((p, i) => (
-          <Reveal key={p.name} delay={i * 0.08} className="h-full">
-            <motion.div
-              whileHover={{ y: -4 }}
-              transition={SPRING_PRESS}
-              className={cn(
-                "relative flex h-full flex-col p-6",
-                p.popular
-                  ? "rounded-3xl border border-primary/60 bg-card shadow-[0_20px_60px_-24px_var(--primary)]"
-                  : CARD,
-              )}
+          <ScrollReveal key={p.name} delay={i * 0.08} amount={0.15} className="h-full">
+            <Card
+              selected={p.popular}
+              className="h-full gap-0 bg-card p-6 transition-transform duration-300 hover:-translate-y-1"
             >
               {p.popular && (
                 <div className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full bg-primary px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-primary-foreground">
@@ -1728,13 +836,13 @@ export function Pricing() {
               </p>
               <ButtonLink
                 href="/signup"
-                variant={p.popular ? "primary" : "ghost"}
+                variant={p.popular ? "primary" : "outline"}
                 className="w-full"
               >
                 {p.cta}
               </ButtonLink>
-            </motion.div>
-          </Reveal>
+            </Card>
+          </ScrollReveal>
         ))}
       </div>
     </section>
@@ -1742,13 +850,14 @@ export function Pricing() {
 }
 ```
 
-## 17. Security
+**`security.tsx`**
 
 ```tsx
 // app/(public)/_components/security.tsx
 import { ArrowRight } from "lucide-react";
+import { Card } from "@/components/motion/card";
+import { ScrollReveal } from "@/components/motion/scroll-reveal";
 import { H2, SECTION, SECURITY } from "./data";
-import { Reveal } from "./ui";
 
 export function Security() {
   return (
@@ -1756,7 +865,7 @@ export function Security() {
       id="security"
       className={`${SECTION} grid grid-cols-1 items-center gap-10 lg:grid-cols-2 lg:gap-14`}
     >
-      <Reveal className="flex flex-col gap-5 sm:gap-6">
+      <ScrollReveal amount={0.15} className="flex flex-col gap-5 sm:gap-6">
         <span className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
           Security
         </span>
@@ -1773,14 +882,14 @@ export function Security() {
           Learn about security
           <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
         </a>
-      </Reveal>
+      </ScrollReveal>
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4">
         {SECURITY.map((s, i) => {
           const Icon = s.icon;
           return (
-            <Reveal key={s.title} delay={i * 0.08}>
-              <div className="group flex h-36 flex-col items-center justify-center rounded-3xl border border-border bg-card p-4 text-center transition-colors hover:border-primary/40 sm:h-40">
+            <ScrollReveal key={s.title} delay={i * 0.08} amount={0.2} className="h-full">
+              <Card className="group h-full items-center justify-center gap-0 bg-card p-4 text-center transition-colors hover:border-primary/40 sm:min-h-40">
                 <div className="mb-3 grid h-10 w-10 place-items-center rounded-xl border border-border bg-background/60 text-muted-foreground transition-colors group-hover:text-primary">
                   <Icon className="h-[18px] w-[18px]" />
                 </div>
@@ -1788,8 +897,8 @@ export function Security() {
                   {s.title}
                 </span>
                 <span className="text-xs text-muted-foreground">{s.desc}</span>
-              </div>
-            </Reveal>
+              </Card>
+            </ScrollReveal>
           );
         })}
       </div>
@@ -1798,15 +907,15 @@ export function Security() {
 }
 ```
 
-## 18. FAQ (beUI Bouncy Accordion)
+**`faq.tsx`**
 
 ```tsx
 // app/(public)/_components/faq.tsx
 import { CircleHelp } from "lucide-react";
 import { BouncyAccordion } from "@/components/motion/bouncy-accordion";
+import { ScrollReveal } from "@/components/motion/scroll-reveal";
 import { FAQ, SECTION } from "./data";
 import { SectionHeading } from "./section-heading";
-import { Reveal } from "./ui";
 
 const items = FAQ.map((f, i) => ({
   id: `faq-${i}`,
@@ -1819,50 +928,54 @@ export function Faq() {
   return (
     <section className={`${SECTION} max-w-3xl`}>
       <SectionHeading eyebrow="FAQ" title="Frequently asked questions" />
-      <Reveal>
+      <ScrollReveal amount={0.1}>
         <BouncyAccordion
           items={items}
           defaultValue="faq-0"
           classNames={{
-            // the default title truncates; allow wrapping on small screens
+            // beUI's title truncates by default; let long questions wrap on phones
             title: "whitespace-normal! overflow-visible! text-clip! py-3 leading-snug",
             trigger: "items-center",
           }}
         />
-      </Reveal>
+      </ScrollReveal>
     </section>
   );
 }
 ```
-
-## 19. Footer
 
 **`footer.tsx`**
 
 ```tsx
 // app/(public)/_components/footer.tsx
 import { Globe, MessageCircle } from "lucide-react";
+import { ButtonLink } from "@/components/motion/button";
+import { Card } from "@/components/motion/card";
+import { ScrollReveal } from "@/components/motion/scroll-reveal";
 import { FOOTER_COLUMNS } from "./data";
 import { Logo } from "./logo";
 import { NewsletterForm } from "./newsletter-form";
-import { ButtonLink, Reveal } from "./ui";
 
 export function Footer() {
   return (
     <footer className="w-full border-t border-border bg-card/40 px-4 pb-10 pt-16 sm:px-6 md:pt-24 lg:px-8">
       {/* Final CTA */}
-      <Reveal className="relative mx-auto mb-16 max-w-7xl overflow-hidden rounded-[32px] border border-border bg-card px-6 py-14 text-center md:mb-20 md:py-20">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute left-1/2 top-0 h-64 w-[min(700px,100%)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/25 blur-[100px]"
-        />
-        <h2 className="relative mb-8 text-4xl font-semibold tracking-tighter text-balance text-foreground sm:text-6xl md:text-7xl">
-          Ready to grow?
-        </h2>
-        <ButtonLink href="/signup" size="lg" className="relative">
-          Create Your Account
-        </ButtonLink>
-      </Reveal>
+      <ScrollReveal amount={0.2} className="mx-auto mb-16 max-w-7xl md:mb-20">
+        <Card className="relative gap-0 overflow-hidden rounded-[32px] bg-card px-6 py-14 text-center md:py-20">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute left-1/2 top-0 h-64 w-[min(700px,100%)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/25 blur-[100px]"
+          />
+          <h2 className="relative mb-8 text-4xl font-semibold tracking-tighter text-balance text-foreground sm:text-6xl md:text-7xl">
+            Ready to grow?
+          </h2>
+          <div className="relative">
+            <ButtonLink href="/signup" size="lg" className="sm:px-8">
+              Create Your Account
+            </ButtonLink>
+          </div>
+        </Card>
+      </ScrollReveal>
 
       {/* Link grid */}
       <div className="mx-auto mb-14 grid max-w-7xl grid-cols-2 gap-x-6 gap-y-10 md:grid-cols-4 lg:grid-cols-6 lg:gap-12">
@@ -1920,16 +1033,15 @@ export function Footer() {
 }
 ```
 
-**`newsletter-form.tsx`** (new)
+**`newsletter-form.tsx`**
 
 ```tsx
 // app/(public)/_components/newsletter-form.tsx
 "use client";
 
 import { useState } from "react";
-import { motion } from "motion/react";
 import { Check } from "lucide-react";
-import { SPRING_PRESS } from "@/lib/ease";
+import { Button } from "@/components/motion/button";
 
 export function NewsletterForm() {
   const [done, setDone] = useState(false);
@@ -1954,12 +1066,7 @@ export function NewsletterForm() {
           placeholder="Email address"
           className="min-w-0 flex-1 bg-transparent px-4 text-sm text-foreground outline-none placeholder:text-muted-foreground"
         />
-        <motion.button
-          type="submit"
-          whileTap={{ scale: 0.95 }}
-          transition={SPRING_PRESS}
-          className="inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground"
-        >
+        <Button type="submit" size="md" className="h-9 px-4 text-sm">
           {done ? (
             <>
               <Check className="h-4 w-4" /> Joined
@@ -1967,24 +1074,23 @@ export function NewsletterForm() {
           ) : (
             "Join"
           )}
-        </motion.button>
+        </Button>
       </div>
     </form>
   );
 }
 ```
 
-## What changed
+## Notes
 
-- **Responsive layouts:**
+- **Real beUI components in use:** Button, Card, Tabs, Tilt Card, Number Ticker, Text Reveal, Text Shimmer, Scroll Reveal, Theme Toggle (circle reveal), Bouncy Accordion and Code Block. Each section also uses the beUI theme tokens and the `.glass` utility.
+- **Links in `ButtonLink`:** beUI's `ButtonLink` renders a plain `<a>`, not Next's `<Link>`. Navigation to `/signup` and `/signin` therefore does a full page load. If you want client-side navigation, I can wrap it.
+- **Scroll reveal on tall elements:** `ScrollReveal` waits until 30% of an element is visible by default. I lowered `amount` on tall blocks so they still reveal on phones.
+- **Responsive behavior:**
+  - Navbar: collapses to a menu button below `md`.
   - Metrics: 2 columns on mobile, 3+2 on tablet, 5 on desktop.
-  - Features: a 2-wide first card, then a 1/2/3-column grid.
-  - AI Trading: stacks below `lg`, so tablets don't get a cramped code window.
+  - Features: the first card is wider, then 1, 2 and 3 columns.
+  - AI Trading: stacks below `lg`.
   - Pricing: 1, then 2, then 4 columns.
-  - Navbar: collapses to a menu button on mobile.
-  - Fonts and spacing scale at every breakpoint.
-- **Navbar links:** I added links to the section anchors (`#features`, `#trading`, `#referral`, `#plans`). Several sections gained `id`s, and the feature-card CTAs now point at real anchors instead of `#`.
-- **Pricing buttons:** they were dead `<button>`s, so they now link to `/signup`.
-- **Hero tabs:** the Main, Investment and Trading tabs switch between demo numbers. I made up the Main and Trading values, so replace them in `WALLET_PREVIEW`.
-- **Newsletter:** the Join button shows a "Joined" state, but nothing is sent yet. Wire it up where the `TODO` is.
-- **FAQ titles:** beUI's accordion truncates long titles, so I override it with `whitespace-normal!` so they wrap on phones.
+  - FAQ: titles wrap instead of truncating.
+- **Extras I added:** the navbar section links, the `id`s on sections, and the pricing buttons now linking to `/signup`.
