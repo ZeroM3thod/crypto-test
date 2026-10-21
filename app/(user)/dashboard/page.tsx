@@ -17,6 +17,7 @@ import {
 import { useEffect, useState } from "react";
 import { BouncyAccordion } from "@/components/motion/bouncy-accordion";
 import { DitherLoader } from "@/components/motion/loader";
+import { useWalletData } from "@/app/(user)/wallet/use-wallet-data";
 import { WalletCard } from "@/components/motion/wallet-card";
 import { AccountTransfer } from "@/components/motion/account-transfer";
 import { useRouter } from "next/navigation";
@@ -359,7 +360,7 @@ function ActivityOverviewTabs({ activity }: { activity: ActivityData }) {
 
 // ── Transfer dialog ──────────────────────────────────────────────────────────
 
-function TransferDialog({ onClose }: { onClose: () => void }) {
+function TransferDialog({ onClose, accounts, onTransfer }: { onClose: () => void; accounts: React.ComponentProps<typeof AccountTransfer>["accounts"]; onTransfer: (fromId: string, toId: string, amount: number) => Promise<boolean> }) {
   // Close on Esc + lock background scroll while open
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -399,9 +400,11 @@ function TransferDialog({ onClose }: { onClose: () => void }) {
         </div>
         <div className="max-h-[85vh] overflow-y-auto">
           <AccountTransfer
-            onConfirm={() => {
-              // TODO: call your transfer API with { fromId, toId, amount }
-              onClose();
+            accounts={accounts}
+            defaultFromId="main"
+            defaultToId="investment"
+            onConfirm={async ({ fromId, toId, amount }) => {
+              if (await onTransfer(fromId, toId, amount)) onClose();
             }}
           />
         </div>
@@ -412,6 +415,7 @@ function TransferDialog({ onClose }: { onClose: () => void }) {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { data: walletData, transfer } = useWalletData();
   const [transferOpen, setTransferOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState<{
@@ -582,7 +586,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Transfer Dialog ─────────────────────── */}
-      {transferOpen && <TransferDialog onClose={() => setTransferOpen(false)} />}
+      {transferOpen && <TransferDialog onClose={() => setTransferOpen(false)} accounts={walletData.accounts} onTransfer={transfer} />}
     </UserShell>
   );
 }
