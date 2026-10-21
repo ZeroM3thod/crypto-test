@@ -499,7 +499,7 @@ $$;
 -- Daily profit plan configuration (admin-editable)
 create table if not exists public.daily_profit_plans (
   id uuid primary key default gen_random_uuid(),
-  plan_id text not null unique check (plan_id in ('starter', 'growth', 'elite')),
+  plan_id text not null unique check (plan_id ~ '^[a-z0-9_]{1,64}$'),
   name text not null,
   daily_rate numeric(5, 2) not null check (daily_rate > 0),
   minimum_amount numeric(18, 2) not null check (minimum_amount > 0),
@@ -511,6 +511,8 @@ create table if not exists public.daily_profit_plans (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+alter table public.daily_profit_plans drop constraint if exists daily_profit_plans_plan_id_check;
+alter table public.daily_profit_plans add constraint daily_profit_plans_plan_id_check check (plan_id ~ '^[a-z0-9_]{1,64}$');
 
 -- User investments in daily profit plans
 create table if not exists public.daily_profit_investments (

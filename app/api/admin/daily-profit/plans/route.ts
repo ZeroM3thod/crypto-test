@@ -23,7 +23,8 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => null);
-  const { plan_id, name, daily_rate, minimum_amount, badge_label, cancel_policy_hours, cancel_policy_seconds, profit_interval_seconds } = body;
+  const { plan_id, name, daily_rate, minimum_amount, badge_label, cancel_policy_hours, cancel_policy_seconds, profit_interval_seconds } = body ?? {};
+  if (!/^[a-z0-9_]{1,64}$/.test(plan_id || "") || !String(name || "").trim() || !(Number(daily_rate) > 0) || !(Number(minimum_amount) > 0)) return bad("Invalid plan details", 400);
 
   await supabase("daily_profit_plans", {
     method: "POST",

@@ -305,8 +305,8 @@ export function DailyProfitManagement() {
         );
       } else {
         // Create new
-        const planId = form.name.trim().toLowerCase().replace(/\s+/g, "_");
-        await fetch("/api/admin/daily-profit/plans", {
+        const planId = form.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 64);
+        const res = await fetch("/api/admin/daily-profit/plans", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -319,6 +319,10 @@ export function DailyProfitManagement() {
             cancel_policy_seconds: lockSec,
           }),
         });
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          throw new Error(data?.message || "Could not create plan");
+        }
 
         // Refresh plans
         const data = await fetch("/api/admin/daily-profit/plans").then(r => r.json());
@@ -340,7 +344,7 @@ export function DailyProfitManagement() {
       setForm(null);
     } catch (err) {
       console.error(err);
-      setError("Save failed");
+      setError(err instanceof Error ? err.message : "Save failed");
     }
   }
 
