@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { BouncyAccordion } from "@/components/motion/bouncy-accordion";
+import { DitherLoader } from "@/components/motion/loader";
 import { WalletCard } from "@/components/motion/wallet-card";
 import { AccountTransfer } from "@/components/motion/account-transfer";
 import { useRouter } from "next/navigation";
@@ -468,6 +469,16 @@ export default function DashboardPage() {
     ShieldCheck: <ShieldCheck className="h-4 w-4" />,
     Bell: <Bell className="h-4 w-4" />,
   };
+
+  if (loading) {
+    return (
+      <UserShell active="Dashboard">
+        <div className="grid min-h-[70vh] place-items-center">
+          <DitherLoader size={44} label="Loading dashboard" />
+        </div>
+      </UserShell>
+    );
+  }
 
   return (
     <UserShell active="Dashboard">
