@@ -2,6 +2,7 @@
 "use client";
 
 import { UserShell } from "@/app/(user)/_components/user-shell";
+import { DitherLoader } from "@/components/motion/loader";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -866,6 +867,7 @@ export default function KycPage() {
 
   return (
     <UserShell active="KYC Verification">
+      {loading ? <div className="grid min-h-[70vh] place-items-center"><DitherLoader size={44} label="Loading KYC status" /></div> : (
       <div className="mx-auto w-full max-w-7xl space-y-6 overflow-x-hidden overflow-y-auto px-4 py-5 sm:space-y-8 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
 
         {/* ── Header ────────────────────────────────────── */}
@@ -1326,6 +1328,7 @@ export default function KycPage() {
 
         <div className="h-16 sm:h-20" />
       </div>
+      )}
     </UserShell>
   );
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { UserShell } from "@/app/(user)/_components/user-shell";
+import { DitherLoader } from "@/components/motion/loader";
 import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -291,7 +292,7 @@ export default function ProfilePage() {
     return (
       <UserShell active="Profile">
         <div className="flex min-h-screen items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-foreground border-t-transparent" />
+          <DitherLoader size={44} label="Loading profile" />
         </div>
       </UserShell>
     );

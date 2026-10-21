@@ -2,6 +2,7 @@
 "use client";
 
 import { UserShell } from "@/app/(user)/_components/user-shell";
+import { DitherLoader } from "@/components/motion/loader";
 import { useMemo, useState, useEffect } from "react";
 import {
   ArrowDownCircle,
@@ -130,12 +131,8 @@ export default function FundHistoryPage() {
 
   return (
     <UserShell active="Fund History">
+      {loading ? <div className="grid min-h-[70vh] place-items-center"><DitherLoader size={44} label="Loading fund history" /></div> : (
       <div className="relative overflow-y-auto px-5 py-6 sm:px-7 sm:py-8">
-        {loading ? (
-          <div className="flex h-full items-center justify-center">
-            <div className="text-muted-foreground">Loading...</div>
-          </div>
-        ) : (
           <div className="mx-auto max-w-2xl space-y-6">
           {/* Header */}
           <div>
@@ -369,9 +366,9 @@ export default function FundHistoryPage() {
             </div>
           </div>
         )}
-        </div>
-      )}
+          </div>
       </div>
+      )}
     </UserShell>
   );
 }

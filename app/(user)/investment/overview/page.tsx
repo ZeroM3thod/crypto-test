@@ -2,6 +2,7 @@
 "use client";
 
 import { UserShell } from "@/app/(user)/_components/user-shell";
+import { DitherLoader } from "@/components/motion/loader";
 import {
   ArrowUpRight,
   ArrowDownRight,
@@ -472,6 +473,7 @@ export default function InvestmentOverviewPage() {
 
   return (
     <UserShell active="Overview">
+      {loading ? <div className="grid min-h-[70vh] place-items-center"><DitherLoader size={44} label="Loading investments" /></div> : <>
       <div className="overflow-y-auto px-5 py-6 sm:px-7 sm:py-8 space-y-8">
 
         {/* ── Greeting ───────────────────────────── */}
@@ -588,6 +590,7 @@ export default function InvestmentOverviewPage() {
           onClose={() => setSelectedPackage(null)}
         />
       )}
+      </>}
     </UserShell>
   );
 }

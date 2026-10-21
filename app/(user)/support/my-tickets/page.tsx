@@ -3,6 +3,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { UserShell } from "@/app/(user)/_components/user-shell";
+import { DitherLoader } from "@/components/motion/loader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -178,6 +179,7 @@ export default function MyTicketsPage() {
 
   return (
     <UserShell active="My Tickets">
+      {loading ? <div className="grid min-h-[70vh] place-items-center"><DitherLoader size={44} label="Loading support tickets" /></div> : <>
       <div className="overflow-y-auto px-5 py-6 sm:px-7 sm:py-8">
         <div className="mx-auto w-full max-w-4xl">
 
@@ -335,6 +337,7 @@ export default function MyTicketsPage() {
           )}
         </DialogContent>
       </Dialog>
+      </>}
     </UserShell>
   );
 }

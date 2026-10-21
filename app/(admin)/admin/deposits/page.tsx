@@ -2,6 +2,7 @@
 "use client";
 
 import { AdminShell } from "../../_components/admin-shell";
+import { DitherLoader } from "@/components/motion/loader";
 import { DepositsView } from "../../_components/deposits-view";
 import { useEffect, useState } from "react";
 
@@ -25,8 +26,8 @@ export default function AdminDepositsPage() {
   if (loading) {
     return (
       <AdminShell active="Deposits">
-        <div className="flex items-center justify-center p-8">
-          <p className="text-muted-foreground">Loading deposits...</p>
+        <div className="grid min-h-[70vh] place-items-center">
+          <DitherLoader size={44} label="Loading deposits" />
         </div>
       </AdminShell>
     );

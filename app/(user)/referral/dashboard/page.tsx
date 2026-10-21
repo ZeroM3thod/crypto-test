@@ -2,6 +2,7 @@
 "use client";
 
 import { UserShell } from "@/app/(user)/_components/user-shell";
+import { DitherLoader } from "@/components/motion/loader";
 import { useState, useEffect } from "react";
 import { AnimatePresence, motion, type HTMLMotionProps } from "motion/react";
 import {
@@ -299,8 +300,8 @@ export default function ReferralDashboardPage() {
   if (loading || !data) {
     return (
       <UserShell active="Referral">
-        <div className="flex h-full items-center justify-center">
-          <div className="text-muted-foreground">Loading...</div>
+        <div className="grid min-h-[70vh] place-items-center">
+          <DitherLoader size={44} label="Loading referrals" />
         </div>
       </UserShell>
     );

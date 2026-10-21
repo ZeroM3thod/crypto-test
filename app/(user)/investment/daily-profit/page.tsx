@@ -1,6 +1,7 @@
 "use client";
 
 import { UserShell } from "@/app/(user)/_components/user-shell";
+import { DitherLoader } from "@/components/motion/loader";
 import {
   ArrowUpRight,
   ArrowDownRight,
@@ -925,6 +926,7 @@ export default function DailyProfitPage() {
 
   return (
     <UserShell active="Daily Profit">
+      {loading ? <div className="grid min-h-[70vh] place-items-center"><DitherLoader size={44} label="Loading daily profit" /></div> : <>
       <div className="overflow-y-auto px-5 py-6 sm:px-7 sm:py-8 space-y-8">
 
         {/* ── Header ── */}
@@ -1078,6 +1080,7 @@ export default function DailyProfitPage() {
 
       {/* ── Toast ── */}
       {toast && <Toast message={toast} onClose={dismissToast} />}
+      </>}
     </UserShell>
   );
 }

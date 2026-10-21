@@ -2,6 +2,7 @@
 "use client";
 
 import { UserShell } from "@/app/(user)/_components/user-shell";
+import { DitherLoader } from "@/components/motion/loader";
 import {
   Check,
   ChevronDown,
@@ -408,8 +409,8 @@ export default function LoginHistoryPage() {
   if (loading) {
     return (
       <UserShell active="Login History">
-        <div className="flex h-full items-center justify-center">
-          <div className="text-muted-foreground">Loading...</div>
+        <div className="grid min-h-[70vh] place-items-center">
+          <DitherLoader size={44} label="Loading login history" />
         </div>
       </UserShell>
     );

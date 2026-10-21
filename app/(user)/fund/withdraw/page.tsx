@@ -2,6 +2,7 @@
 "use client";
 
 import { UserShell } from "@/app/(user)/_components/user-shell";
+import { DitherLoader } from "@/components/motion/loader";
 import { useState, useEffect } from "react";
 import { AlertTriangle, Check, Wallet, X } from "lucide-react";
 
@@ -239,6 +240,7 @@ export default function WithdrawPage() {
 
   return (
     <UserShell active="Withdraw">
+      {loading ? <div className="grid min-h-[70vh] place-items-center"><DitherLoader size={44} label="Loading withdrawal data" /></div> : (
       <div className="relative overflow-y-auto px-5 py-6 sm:px-7 sm:py-8">
         {/* Toast */}
         {toast.show && (
@@ -655,6 +657,7 @@ export default function WithdrawPage() {
           </div>
         )}
       </div>
+      )}
     </UserShell>
   );
 }
