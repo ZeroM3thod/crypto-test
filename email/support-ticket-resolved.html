@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>Your ticket is resolved</title>
+</head>
+<body style="margin:0;padding:0;background:#ffffff;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#ffffff;">Ticket {{ticket_id}} is {{status}}. Reply within {{reopen_days}} days if you still need help.</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;">
+<tr><td align="center" style="padding:40px 16px;">
+  <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:480px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#2a2a2a;">
+
+    <!-- Brand -->
+    <tr><td style="padding:0 0 32px 0;font-size:18px;font-weight:700;letter-spacing:-0.2px;color:#2a2a2a;">{{brand_name}}</td></tr>
+
+    <tr><td style="padding:0 0 12px 0;font-size:26px;line-height:32px;font-weight:700;letter-spacing:-0.5px;color:#2a2a2a;">Your ticket is {{status}}</td></tr>
+    <tr><td style="padding:0 0 28px 0;font-size:15px;line-height:24px;color:#5a5a5a;">Hi {{first_name}}, we’ve marked your support request as {{status}}. Here’s a summary of what we did.</td></tr>
+
+    <!-- Resolution -->
+    <tr><td style="padding:0 0 28px 0;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#2a2a2a;border-radius:12px;">
+        <tr><td style="padding:24px 22px;">
+          <div style="font-size:13px;color:#b5b5b5;padding-bottom:10px;">Resolution</div>
+          <div style="font-size:15px;line-height:24px;color:#ffffff;">{{resolution_summary}}</div>
+        </td></tr>
+      </table>
+    </td></tr>
+
+    <tr><td style="padding:0 0 28px 0;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+      <tr><td style="padding:14px 0;border-top:1px solid #ececec;font-size:14px;color:#8a8a8a;">Ticket</td><td align="right" style="padding:14px 0 14px 16px;border-top:1px solid #ececec;font-size:14px;font-weight:600;color:#2a2a2a;">{{ticket_id}}</td></tr>
+      <tr><td style="padding:14px 0;border-top:1px solid #ececec;font-size:14px;color:#8a8a8a;">Subject</td><td align="right" style="padding:14px 0 14px 16px;border-top:1px solid #ececec;font-size:14px;font-weight:600;color:#2a2a2a;">{{ticket_subject}}</td></tr>
+      <tr><td style="padding:14px 0;border-top:1px solid #ececec;font-size:14px;color:#8a8a8a;">Status</td><td align="right" style="padding:14px 0 14px 16px;border-top:1px solid #ececec;font-size:14px;font-weight:600;color:#2a2a2a;">{{status}}</td></tr>
+      <tr><td style="padding:14px 0;border-top:1px solid #ececec;font-size:14px;color:#8a8a8a;">Opened</td><td align="right" style="padding:14px 0 14px 16px;border-top:1px solid #ececec;font-size:14px;font-weight:600;color:#2a2a2a;">{{opened_date}}</td></tr>
+      <tr><td style="padding:14px 0;border-top:1px solid #ececec;font-size:14px;color:#8a8a8a;">Resolved</td><td align="right" style="padding:14px 0 14px 16px;border-top:1px solid #ececec;font-size:14px;font-weight:600;color:#2a2a2a;">{{resolved_date}}</td></tr>
+      <tr><td style="padding:14px 0;border-top:1px solid #ececec;border-bottom:1px solid #ececec;font-size:14px;color:#8a8a8a;">Handled by</td><td align="right" style="padding:14px 0 14px 16px;border-top:1px solid #ececec;border-bottom:1px solid #ececec;font-size:14px;font-weight:600;color:#2a2a2a;">{{agent_name}}</td></tr>
+    </table></td></tr>
+
+    <!-- Buttons -->
+    <tr><td style="padding:0 0 8px 0;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+        <td align="center" bgcolor="#2a2a2a" style="border-radius:8px;"><a href="{{ticket_url}}" style="display:inline-block;padding:14px 24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;">View ticket</a></td>
+        <td width="12" style="font-size:0;line-height:0;">&nbsp;</td>
+        <td align="center" style="border:1px solid #2a2a2a;border-radius:8px;"><a href="{{reopen_url}}" style="display:inline-block;padding:13px 24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;color:#2a2a2a;text-decoration:none;border-radius:8px;">Reopen</a></td>
+      </tr></table>
+    </td></tr>
+    <tr><td style="padding:20px 0 0 0;font-size:13px;line-height:20px;color:#8a8a8a;">Still need help? Reopen the ticket or reply to this email within {{reopen_days}} days. After that, the ticket is closed for good and you can open a new one.</td></tr>
+
+    <!-- Feedback -->
+    <tr><td style="padding:28px 0 0 0;font-size:14px;line-height:22px;color:#5a5a5a;">How did we do? <a href="{{feedback_url}}" style="color:#2a2a2a;font-weight:600;">Rate your support</a></td></tr>
+
+    <!-- Footer -->
+    <tr><td style="padding:32px 0 0 0;border-top:1px solid #ececec;font-size:12px;line-height:18px;color:#8a8a8a;">
+      You received this because you contacted {{brand_name}} support.<br>
+      {{company_address}} &nbsp;|&nbsp; <a href="{{support_url}}" style="color:#8a8a8a;text-decoration:underline;">Help center</a>
+    </td></tr>
+
+  </table>
+</td></tr>
+</table>
+</body>
+</html>

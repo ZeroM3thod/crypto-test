@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getSession, bad } from "@/lib/auth/backend";
 import { db } from "@/lib/db";
+import { sendNotificationEmail } from "@/lib/email/templates/notifications";
 
 export async function GET(req: NextRequest) {
   const session = await getSession(req);
@@ -161,7 +162,7 @@ export async function PATCH(req: NextRequest) {
 
   const { data: ticket } = await db
     .from('support_tickets')
-    .select('id, user:user_id(hidden_from_admins)')
+    .select('id, ticket_id, subject, category, priority, status, created_at, updated_at, user:user_id(hidden_from_admins,email,first_name,last_name)')
     .eq('id', ticketId)
     .single();
   if (!ticket) return bad("Ticket not found", 404);
@@ -185,6 +186,12 @@ export async function PATCH(req: NextRequest) {
       description: `Status changed to ${status}`,
       performer_id: session.user.id
     });
+
+  if (status === 'resolved' && ticket.status !== 'resolved' && (ticket.user as any)?.email) {
+    try {
+      await sendNotificationEmail((ticket.user as any).email, "Support ticket resolved", `Your support ticket “${ticket.subject}” has been resolved.`, { "Ticket ID": ticket.ticket_id, Subject: ticket.subject, Category: ticket.category, Priority: ticket.priority, Status: "Resolved", "Created at": ticket.created_at, "Resolved at": new Date().toISOString(), "Account name": [(ticket.user as any).first_name, (ticket.user as any).last_name].filter(Boolean).join(" ") || "Not available" });
+    } catch (error) { console.error('Support ticket email failed:', error); }
+  }
 
   return Response.json({ success: true });
 }

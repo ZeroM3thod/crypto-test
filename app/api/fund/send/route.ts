@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { bad, getSession, supabase, q, txHash } from "@/lib/auth/backend";
+import { sendNotificationEmail } from "@/lib/email/templates/notifications";
 
 const SEND_FEE = 0.1;
 
@@ -113,6 +114,21 @@ export async function POST(req: NextRequest) {
       status: "completed",
     }),
   });
+
+  try {
+    await sendNotificationEmail(recipient.email, "You received money", `${session.user.first_name || "A user"} sent money to your Main wallet.`, {
+      "Transaction ID": txId,
+      "Sender name": `${session.user.first_name || ""} ${session.user.last_name || ""}`.trim() || "User",
+      "Sender email": session.user.email,
+      Amount: `${amount.toFixed(2)} USDT`,
+      "Recipient wallet": "Main",
+      "Transfer fee paid by sender": `${SEND_FEE.toFixed(2)} USDT`,
+      "Sender total charged": `${total.toFixed(2)} USDT`,
+      Note: note || "None",
+      Status: "Completed",
+      "Received at": new Date().toISOString(),
+    });
+  } catch (error) { console.error("Money received email failed:", error); }
 
   return Response.json({
     success: true,

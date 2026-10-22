@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>Your verification code</title>
+</head>
+<body style="margin:0;padding:0;background:#ffffff;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#ffffff;">Your {{brand_name}} verification code is {{code}}. It expires in {{expiry_minutes}} minutes.</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;">
+<tr><td align="center" style="padding:40px 16px;">
+  <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:480px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#2a2a2a;">
+
+    <!-- Brand -->
+    <tr><td style="padding:0 0 32px 0;font-size:18px;font-weight:700;letter-spacing:-0.2px;color:#2a2a2a;">{{brand_name}}</td></tr>
+
+    <tr><td style="padding:0 0 12px 0;font-size:26px;line-height:32px;font-weight:700;letter-spacing:-0.5px;color:#2a2a2a;">Verify your email</td></tr>
+    <tr><td style="padding:0 0 28px 0;font-size:15px;line-height:24px;color:#5a5a5a;">Hi {{first_name}}, enter this code to finish creating your {{brand_name}} account.</td></tr>
+    <tr><td style="padding:0 0 28px 0;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#2a2a2a;border-radius:12px;">
+        <tr><td align="center" style="padding:28px 20px;">
+          <div style="font-size:13px;color:#b5b5b5;padding-bottom:10px;">Verification code</div>
+          <div style="-webkit-user-select:all;-moz-user-select:all;user-select:all;font-size:36px;line-height:40px;font-weight:700;letter-spacing:10px;color:#ffffff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">{{code}}</div>
+          <div style="padding-top:10px;font-size:13px;color:#b5b5b5;">Expires in {{expiry_minutes}} minutes</div>
+        </td></tr>
+      </table>
+    </td></tr>
+    <tr><td style="padding:0 0 20px 0;font-size:13px;color:#8a8a8a;" align="center">Or press and hold the code to select it.</td></tr>
+    <tr><td align="center" style="padding:0 0 28px 0;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+        <td align="center" bgcolor="#2a2a2a" style="border-radius:8px;"><a href="{{copy_url}}" style="display:inline-block;padding:14px 28px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;">Copy code</a></td>
+      </tr></table>
+    </td></tr>
+    <tr><td style="padding:0 0 8px 0;font-size:15px;line-height:24px;color:#5a5a5a;">If you didn’t try to sign up, you can safely ignore this email. Never share this code with anyone. {{brand_name}} will never ask for it.</td></tr>
+
+    <!-- Footer -->
+    <tr><td style="padding:32px 0 0 0;border-top:1px solid #ececec;font-size:12px;line-height:18px;color:#8a8a8a;">
+      This is an automated message from {{brand_name}}. Please don’t reply to this email.<br>
+      {{company_address}} &nbsp;|&nbsp; <a href="{{support_url}}" style="color:#8a8a8a;text-decoration:underline;">Support</a>
+    </td></tr>
+
+  </table>
+</td></tr>
+</table>
+</body>
+</html>

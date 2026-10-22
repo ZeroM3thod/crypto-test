@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { adminUnauthorized, getAdminOrNull } from '@/lib/auth/require-admin';
 import { db } from '@/lib/db';
 import { getUserDetail } from '@/lib/admin/users-service';
+import { sendNotificationEmail } from '@/lib/email/templates/notifications';
 
 const err = (error: string, status: number) => NextResponse.json({ error }, { status });
 
@@ -62,6 +63,21 @@ export async function POST(
       .select('*')
       .eq('id', rewardId)
       .single();
+
+    if (user.email) {
+      try {
+        await sendNotificationEmail(user.email, "You received a reward", `A reward has been credited to your ${reward.wallet} wallet.`, {
+          "Reward ID": reward.id,
+          Title: reward.title,
+          Description: reward.description,
+          Amount: `$${Number(reward.amount).toFixed(2)}`,
+          Wallet: reward.wallet,
+          Type: reward.reward_type === 'non_withdrawable' ? 'Non-withdrawable' : 'Withdrawable',
+          Status: 'Credited',
+          "Credited at": reward.created_at,
+        });
+      } catch (emailError) { console.error('Reward notification email failed:', emailError); }
+    }
 
     return NextResponse.json({ 
       reward: {

@@ -1,6 +1,6 @@
 import { createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { renderOtpEmail } from "@/lib/auth/email-template";
+import { renderOtpEmail } from "@/lib/email/templates/otp";
 
 const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
 const OTP_TTL_MS = 15 * 60 * 1000;

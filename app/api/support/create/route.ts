@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getSession, bad } from "@/lib/auth/backend";
 import { db } from "@/lib/db";
+import { sendNotificationEmail } from "@/lib/email/templates/notifications";
 
 export async function POST(req: NextRequest) {
   const session = await getSession(req);
@@ -74,6 +75,11 @@ export async function POST(req: NextRequest) {
       description: 'Ticket created',
       performer_id: session.user.id
     });
+
+  const profile = await db.from('auth_users').select('first_name,last_name,email').eq('id', session.user.id).maybeSingle();
+  try {
+    await sendNotificationEmail(profile.data?.email || session.user.email, "Support ticket created", `Your support ticket “${subject}” was created successfully. We’ll respond as soon as possible.`, { "Ticket ID": ticket.ticket_id, Subject: subject, Category: category, Priority: priority, Status: "Pending", Message: message, "Created at": new Date().toISOString(), "Account name": [profile.data?.first_name, profile.data?.last_name].filter(Boolean).join(" ") || "Not available" });
+  } catch (error) { console.error("Support ticket email failed:", error); }
 
   return Response.json({ success: true, ticketId: ticket.ticket_id });
 }

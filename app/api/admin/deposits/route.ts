@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { bad, getSession, supabase, q } from "@/lib/auth/backend";
 import { visibleUserIdsFor, inFilter } from "@/lib/admin/visibility";
+import { sendNotificationEmail } from "@/lib/email/templates/notifications";
 
 export async function GET(req: NextRequest) {
   const session = await getSession(req);
@@ -75,6 +76,9 @@ export async function PATCH(req: NextRequest) {
     if (!rows[0] || !visibleIds.includes(rows[0].user_id)) return bad("Not found", 404);
   }
 
+  const target = await supabase<{ amount: number; coin: string; network_code: string; transaction_hash: string | null; created_at: string; user_id: string }[]>(`deposits?select=amount,coin,network_code,transaction_hash,created_at,user_id&id=eq.${q(depositId)}&limit=1`);
+  if (!target[0]) return bad("Deposit not found", 404);
+
   if (action === "approve") {
     // Call approve_deposit function
     await supabase("rpc/approve_deposit", {
@@ -96,6 +100,13 @@ export async function PATCH(req: NextRequest) {
         p_reason: reason,
       }),
     });
+  }
+
+  const recipient = await supabase<{ email: string }[]>(`auth_users?select=email&id=eq.${q(target[0].user_id)}&limit=1`);
+  if (recipient[0]?.email) {
+    try {
+      await sendNotificationEmail(recipient[0].email, `Deposit ${action === "approve" ? "approved" : "rejected"}`, `Your deposit has been ${action === "approve" ? "approved" : "rejected"}.`, { "Deposit ID": depositId, Amount: `${target[0].amount} ${target[0].coin}`, Network: target[0].network_code, "Transaction hash": target[0].transaction_hash || "Not provided", "Submitted at": target[0].created_at, Status: action === "approve" ? "Approved" : "Rejected", ...(action === "reject" ? { "Rejection reason": reason } : {}) });
+    } catch (error) { console.error("Deposit notification email failed:", error); }
   }
 
   return Response.json({ success: true });

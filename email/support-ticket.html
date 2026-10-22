@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>Support ticket received</title>
+</head>
+<body style="margin:0;padding:0;background:#ffffff;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#ffffff;">We got your request. Ticket {{ticket_id}} is open and we'll reply within {{response_time}}.</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;">
+<tr><td align="center" style="padding:40px 16px;">
+  <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:480px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#2a2a2a;">
+
+    <!-- Brand -->
+    <tr><td style="padding:0 0 32px 0;font-size:18px;font-weight:700;letter-spacing:-0.2px;color:#2a2a2a;">{{brand_name}}</td></tr>
+
+    <tr><td style="padding:0 0 12px 0;font-size:26px;line-height:32px;font-weight:700;letter-spacing:-0.5px;color:#2a2a2a;">We got your request</td></tr>
+    <tr><td style="padding:0 0 28px 0;font-size:15px;line-height:24px;color:#5a5a5a;">Hi {{first_name}}, your support ticket is open. Our team will reply by email within {{response_time}}.</td></tr>
+
+    <!-- Ticket ID -->
+    <tr><td style="padding:0 0 28px 0;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#2a2a2a;border-radius:12px;">
+        <tr><td align="center" style="padding:28px 20px;">
+          <div style="font-size:13px;color:#b5b5b5;padding-bottom:10px;">Ticket number</div>
+          <div style="-webkit-user-select:all;-moz-user-select:all;user-select:all;font-size:32px;line-height:36px;font-weight:700;letter-spacing:1px;color:#ffffff;">{{ticket_id}}</div>
+        </td></tr>
+      </table>
+    </td></tr>
+
+    <tr><td style="padding:0 0 28px 0;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+      <tr><td style="padding:14px 0;border-top:1px solid #ececec;font-size:14px;color:#8a8a8a;">Subject</td><td align="right" style="padding:14px 0 14px 16px;border-top:1px solid #ececec;font-size:14px;font-weight:600;color:#2a2a2a;">{{ticket_subject}}</td></tr>
+      <tr><td style="padding:14px 0;border-top:1px solid #ececec;font-size:14px;color:#8a8a8a;">Category</td><td align="right" style="padding:14px 0 14px 16px;border-top:1px solid #ececec;font-size:14px;font-weight:600;color:#2a2a2a;">{{ticket_category}}</td></tr>
+      <tr><td style="padding:14px 0;border-top:1px solid #ececec;font-size:14px;color:#8a8a8a;">Priority</td><td align="right" style="padding:14px 0 14px 16px;border-top:1px solid #ececec;font-size:14px;font-weight:600;color:#2a2a2a;">{{priority}}</td></tr>
+      <tr><td style="padding:14px 0;border-top:1px solid #ececec;font-size:14px;color:#8a8a8a;">Status</td><td align="right" style="padding:14px 0 14px 16px;border-top:1px solid #ececec;font-size:14px;font-weight:600;color:#2a2a2a;">{{status}}</td></tr>
+      <tr><td style="padding:14px 0;border-top:1px solid #ececec;font-size:14px;color:#8a8a8a;">Created</td><td align="right" style="padding:14px 0 14px 16px;border-top:1px solid #ececec;font-size:14px;font-weight:600;color:#2a2a2a;">{{date}}</td></tr>
+      <tr><td style="padding:14px 0;border-top:1px solid #ececec;border-bottom:1px solid #ececec;font-size:14px;color:#8a8a8a;">Expected reply</td><td align="right" style="padding:14px 0 14px 16px;border-top:1px solid #ececec;border-bottom:1px solid #ececec;font-size:14px;font-weight:600;color:#2a2a2a;">Within {{response_time}}</td></tr>
+    </table></td></tr>
+
+    <!-- Message -->
+    <tr><td style="padding:0 0 8px 0;font-size:14px;font-weight:600;color:#2a2a2a;">Your message</td></tr>
+    <tr><td style="padding:0 0 28px 0;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+        <td style="padding:16px 18px;border:1px solid #ececec;border-radius:8px;font-size:14px;line-height:22px;color:#5a5a5a;">{{message_preview}}</td>
+      </tr></table>
+    </td></tr>
+
+    <!-- Button -->
+    <tr><td style="padding:0 0 8px 0;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+        <td align="center" bgcolor="#2a2a2a" style="border-radius:8px;"><a href="{{ticket_url}}" style="display:inline-block;padding:14px 28px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;">View ticket</a></td>
+      </tr></table>
+    </td></tr>
+    <tr><td style="padding:20px 0 0 0;font-size:13px;line-height:20px;color:#8a8a8a;">To add details, reply to this email or open the ticket. Please keep {{ticket_id}} in the subject line.</td></tr>
+
+    <!-- Footer -->
+    <tr><td style="padding:32px 0 0 0;border-top:1px solid #ececec;font-size:12px;line-height:18px;color:#8a8a8a;">
+      You received this because you contacted {{brand_name}} support.<br>
+      {{company_address}} &nbsp;|&nbsp; <a href="{{support_url}}" style="color:#8a8a8a;text-decoration:underline;">Help center</a>
+    </td></tr>
+
+  </table>
+</td></tr>
+</table>
+</body>
+</html>
