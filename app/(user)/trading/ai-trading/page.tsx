@@ -117,6 +117,7 @@ type Strategy = {
   invested?: number;
   currentProfit?: number;
   investmentId?: string;
+  packageCreatedAt?: string;
 };
 
 // ── Invest dialog ────────────────────────────────────────────────────────
@@ -411,6 +412,11 @@ function StrategyCard({
   strategy: Strategy;
   onInvest: (strategy: Strategy) => void;
 }) {
+  const [today, setToday] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setToday(new Date()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
   const isLocked = strategy.status === "running";
   const isUnlocked = strategy.status === "unlocked";
   const isEmpty = strategy.status === "not-invested";
@@ -497,7 +503,7 @@ function StrategyCard({
             <dt className="flex items-center gap-1.5 text-muted-foreground">
               <Calendar className="size-3.5" /> Days running
             </dt>
-            <dd className="font-semibold text-foreground">{strategy.daysRunning}</dd>
+            <dd className="font-semibold text-foreground">{strategy.packageCreatedAt ? Math.max(1, Math.floor((Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()) - Date.UTC(new Date(strategy.packageCreatedAt).getUTCFullYear(), new Date(strategy.packageCreatedAt).getUTCMonth(), new Date(strategy.packageCreatedAt).getUTCDate())) / 86400000) + 1) : strategy.daysRunning}</dd>
           </div>
           <div className="flex items-center justify-between pt-2.5">
             <dt className="flex items-center gap-1.5 text-muted-foreground">
@@ -635,10 +641,10 @@ export default function AiTradingPage() {
     if (!sr.ok || !ar.ok) throw new Error(sd.message || data.message || "AI Trading refresh failed");
     const mapped: Strategy[] = sd.strategies.map((s: any) => {
       const inv = data.investments.find((x: any) => x.strategy_id === s.strategy_id);
-      const elapsed = inv ? Math.max(0, Math.floor((Date.now() - new Date(inv.invested_at).getTime()) / 86400000)) : 0;
+      const elapsed = inv ? Math.max(0, Math.floor((Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate()) - Date.UTC(new Date(inv.invested_at).getUTCFullYear(), new Date(inv.invested_at).getUTCMonth(), new Date(inv.invested_at).getUTCDate())) / 86400000)) : 0;
       const daysLeft = inv ? Math.max(0, Math.ceil((new Date(inv.unlock_at).getTime() - Date.now()) / 86400000)) : 0;
-      const strategyDaysRunning = s.started_at ? Math.max(0, Math.floor((Date.now() - new Date(s.started_at).getTime()) / 86400000)) : Number(s.days_running);
-      return { id:s.strategy_id,name:s.name,exchange:s.exchange,minStake:Number(s.min_stake),roiPct:Number(s.total_roi_pct),todayRoiPct:Number(s.today_roi_pct||0),daysRunning:strategyDaysRunning,lockDays:Number(inv?.lock_days ?? s.lock_days),daysElapsed:elapsed,status:!inv?"not-invested":inv.status === "unlocked" || daysLeft === 0?"unlocked":"running",invested:inv?Number(inv.amount):undefined,currentProfit:inv?Number(inv.total_profit):undefined,investmentId:inv?.id };
+      const strategyDaysRunning = elapsed + 1;
+      return { id:s.strategy_id,name:s.name,exchange:s.exchange,minStake:Number(s.min_stake),roiPct:Number(s.total_roi_pct),todayRoiPct:Number(s.today_roi_pct||0),daysRunning:strategyDaysRunning,lockDays:Number(inv?.lock_days ?? s.lock_days),daysElapsed:elapsed,status:!inv?"not-invested":inv.status === "unlocked" || daysLeft === 0?"unlocked":"running",invested:inv?Number(inv.amount):undefined,currentProfit:inv?Number(inv.total_profit):undefined,investmentId:inv?.id,packageCreatedAt:s.created_at };
     });
     setStrategies(mapped);
     setBalance(Number(data.balance) || 0);
