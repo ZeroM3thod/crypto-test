@@ -115,8 +115,6 @@ function SignUpWizardContent() {
     return () => { cancelled = true; clearTimeout(timer); };
   }, [email, referral]);
 
-  if (!pendingChecked) return <div className="flex min-h-screen items-center justify-center">Loading...</div>;
-
   // ---- Per-step validation ----
   const stepErrors = useMemo(() => {
     const e: Record<string, string> = {};
@@ -143,6 +141,8 @@ function SignUpWizardContent() {
     }
     return e;
   }, [step, firstName, lastName, email, mobile, country, password, confirmPassword, terms]);
+
+  if (!pendingChecked) return <div className="flex min-h-screen items-center justify-center">Loading...</div>;
 
   const shownError = (key: string) => (touched[key] ? stepErrors[key] : undefined);
 
