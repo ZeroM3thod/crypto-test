@@ -18,10 +18,7 @@ export const metadata: Metadata = {
   title: "Qouantex",
   description: "Qouantex crypto wealth and trading ecosystem.",
   icons: {
-    icon: [
-      { url: "/icon/bright.png", media: "(prefers-color-scheme: light)" },
-      { url: "/icon/dark.png", media: "(prefers-color-scheme: dark)" },
-    ],
+    icon: "/icon/dark.png",
     shortcut: "/icon/dark.png",
     apple: "/icon/dark.png",
   },
