@@ -30,6 +30,7 @@ function SignUpWizardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [step, setStep] = useState(1);
+  const [pendingChecked, setPendingChecked] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string>();
 
@@ -67,15 +68,16 @@ function SignUpWizardContent() {
   }, [searchParams]);
 
   useEffect(() => {
-    const pendingEmail = sessionStorage.getItem("pending_signup_email");
-    const pendingAt = Number(sessionStorage.getItem("pending_signup_at"));
+    const pendingEmail = localStorage.getItem("pending_signup_email");
+    const pendingAt = Number(localStorage.getItem("pending_signup_at"));
     if (pendingEmail && pendingAt && Date.now() - pendingAt < 30 * 60 * 1000) {
       setEmail(pendingEmail);
       setStep(6);
     } else {
-      sessionStorage.removeItem("pending_signup_email");
-      sessionStorage.removeItem("pending_signup_at");
+      localStorage.removeItem("pending_signup_email");
+      localStorage.removeItem("pending_signup_at");
     }
+    setPendingChecked(true);
   }, []);
 
   // touched flags per-field, reused across steps (same pattern as SignUpForm)
@@ -85,6 +87,8 @@ function SignUpWizardContent() {
   }, []);
 
   const strength = passwordStrength(password);
+
+  if (!pendingChecked) return <div className="flex min-h-screen items-center justify-center">Loading...</div>;
 
   useEffect(() => {
     const validEmail = EMAIL_PATTERN.test(email.trim());
@@ -180,8 +184,8 @@ function SignUpWizardContent() {
           setSubmitting(false);
           return;
         }
-        sessionStorage.setItem("pending_signup_email", email.trim().toLowerCase());
-        sessionStorage.setItem("pending_signup_at", String(Date.now()));
+        localStorage.setItem("pending_signup_email", email.trim().toLowerCase());
+        localStorage.setItem("pending_signup_at", String(Date.now()));
         setSubmitting(false);
         setStep(6);
       } catch {
@@ -425,8 +429,8 @@ function SignUpWizardContent() {
                   body: JSON.stringify({ email, code: v }),
                 });
                 if (res.ok) {
-                  sessionStorage.removeItem("pending_signup_email");
-                  sessionStorage.removeItem("pending_signup_at");
+                  localStorage.removeItem("pending_signup_email");
+                  localStorage.removeItem("pending_signup_at");
                   setOtpStatus("success");
                   setTimeout(() => router.push("/dashboard"), 900);
                 } else {
