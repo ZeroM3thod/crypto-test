@@ -60,11 +60,10 @@ const OWNER_ADDRESSES: Record<Asset, Record<Network, string>> = {
   },
 };
 
-const getQRPath = (asset: Asset, network: Network, hiddenFromAdmins: boolean): string => {
-  const assetLower = asset.toLowerCase();
-  const networkName = network === "Polygon_POS" ? "polygon-pos" : network.toLowerCase();
-  const roleType = hiddenFromAdmins ? "owner" : "admin";
-  return `/qr/${assetLower}-${networkName}-${roleType}.png`;
+const getQRPath = (network: Network, hiddenFromAdmins: boolean): string => {
+  const role = hiddenFromAdmins ? "owner" : "admin";
+  const file = network === "Aptos" ? `aptos-${role}` : network === "Solana" ? `sol-${role}` : `bep-20,pol,erc-20-${role}`;
+  return `/qr/${file}.svg`;
 };
 
 const NET_INFO: Record<Network, { chain: string; desc: string }> = {
@@ -175,8 +174,8 @@ export default function DepositPage() {
   }, []);
 
   const goToStep2 = () => {
-    if (!depState.amount || depState.amount < 30) {
-      showToast("Please enter a valid amount (min $30)");
+    if (!depState.amount || depState.amount < 10) {
+      showToast("Please enter a valid amount (min $10)");
       return;
     }
     setStep(2);
@@ -401,7 +400,7 @@ export default function DepositPage() {
                 <input
                   type="number"
                   inputMode="decimal"
-                  min={30}
+                  min={10}
                   placeholder="Enter amount e.g. 750"
                   value={customAmt}
                   onChange={(e) => {
@@ -412,7 +411,7 @@ export default function DepositPage() {
                   }}
                   className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-base text-foreground outline-none sm:text-sm transition-colors placeholder:text-muted-foreground focus:border-foreground"
                 />
-                <p className="mt-1.5 text-xs text-muted-foreground">Minimum deposit: $30</p>
+                <p className="mt-1.5 text-xs text-muted-foreground">Minimum deposit: $10</p>
               </div>
 
               {/* Summary pill */}
@@ -530,7 +529,7 @@ export default function DepositPage() {
                 <div className="flex flex-col items-center gap-2">
                   <div className="flex size-[160px] items-center justify-center overflow-hidden rounded-2xl border border-border bg-muted/40">
                     <img
-                      src={getQRPath(depState.asset, depState.network as Network, depState.hiddenFromAdmins)}
+                      src={getQRPath(depState.network as Network, depState.hiddenFromAdmins)}
                       alt={`QR code for ${depState.asset} ${depState.network} deposit`}
                       className="size-full object-cover"
                     />
