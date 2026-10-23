@@ -17,6 +17,10 @@ export async function middleware(req: NextRequest) {
   // Role-based access control
   const session = await getSessionUser(req.cookies.get("session_token")?.value);
 
+  if (pathname === "/signin" && session) {
+    return NextResponse.redirect(new URL("/dashboard", req.url));
+  }
+
   // Owner routes - ONLY owner can access
   if (pathname.startsWith("/owner")) {
     if (!session || session.role !== "owner") {
@@ -58,6 +62,7 @@ export async function middleware(req: NextRequest) {
 export const config = {
   matcher: [
     "/join",
+    "/signin",
     "/owner/:path*",
     "/admin/:path*",
     "/dashboard/:path*",
