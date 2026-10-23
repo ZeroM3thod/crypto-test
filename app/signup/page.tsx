@@ -66,6 +66,18 @@ function SignUpWizardContent() {
     }
   }, [searchParams]);
 
+  useEffect(() => {
+    const pendingEmail = sessionStorage.getItem("pending_signup_email");
+    const pendingAt = Number(sessionStorage.getItem("pending_signup_at"));
+    if (pendingEmail && pendingAt && Date.now() - pendingAt < 30 * 60 * 1000) {
+      setEmail(pendingEmail);
+      setStep(6);
+    } else {
+      sessionStorage.removeItem("pending_signup_email");
+      sessionStorage.removeItem("pending_signup_at");
+    }
+  }, []);
+
   // touched flags per-field, reused across steps (same pattern as SignUpForm)
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const touch = useCallback((key: string) => {
@@ -168,6 +180,8 @@ function SignUpWizardContent() {
           setSubmitting(false);
           return;
         }
+        sessionStorage.setItem("pending_signup_email", email.trim().toLowerCase());
+        sessionStorage.setItem("pending_signup_at", String(Date.now()));
         setSubmitting(false);
         setStep(6);
       } catch {
@@ -411,6 +425,8 @@ function SignUpWizardContent() {
                   body: JSON.stringify({ email, code: v }),
                 });
                 if (res.ok) {
+                  sessionStorage.removeItem("pending_signup_email");
+                  sessionStorage.removeItem("pending_signup_at");
                   setOtpStatus("success");
                   setTimeout(() => router.push("/dashboard"), 900);
                 } else {

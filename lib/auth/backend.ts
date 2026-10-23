@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { renderOtpEmail } from "@/lib/email/templates/otp";
 
 const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
-const OTP_TTL_MS = 15 * 60 * 1000;
+const OTP_TTL_MS = 30 * 60 * 1000;
 const SESSION_TTL_MS = 5 * 60 * 60 * 1000;
 const PHONE_PATTERN = /^\+[1-9]\d{6,14}$/;
 
