@@ -88,8 +88,6 @@ function SignUpWizardContent() {
 
   const strength = passwordStrength(password);
 
-  if (!pendingChecked) return <div className="flex min-h-screen items-center justify-center">Loading...</div>;
-
   useEffect(() => {
     const validEmail = EMAIL_PATTERN.test(email.trim());
     const code = referral.trim();
@@ -116,6 +114,8 @@ function SignUpWizardContent() {
     }, 350);
     return () => { cancelled = true; clearTimeout(timer); };
   }, [email, referral]);
+
+  if (!pendingChecked) return <div className="flex min-h-screen items-center justify-center">Loading...</div>;
 
   // ---- Per-step validation ----
   const stepErrors = useMemo(() => {
