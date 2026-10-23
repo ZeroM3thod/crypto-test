@@ -17,6 +17,7 @@ type Strategy = {
   minStake: number;
   lockDays: number;     // default lock for NEW investors
   daysRunning: number;
+  createdAt?: string;
   totalRoi: number;     // % since inception (moves with every posted daily ROI, can go down)
   investors?: number;
   totalStaked?: number;
@@ -105,8 +106,14 @@ function AdminStrategyCard({
   onPostRoi: () => void;
   onRoiList?: () => void;
 }) {
+  const [today, setToday] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setToday(new Date()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
   const isSet = todayRoi !== null;
   const estCredit = isSet ? round2((totalStaked * (todayRoi as number)) / 100) : 0;
+  const runningDays = strategy.createdAt ? Math.max(1, Math.floor((Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()) - Date.UTC(new Date(strategy.createdAt).getUTCFullYear(), new Date(strategy.createdAt).getUTCMonth(), new Date(strategy.createdAt).getUTCDate())) / 86400000) + 1) : strategy.daysRunning;
 
   return (
     <Card>
@@ -117,7 +124,7 @@ function AdminStrategyCard({
         </div>
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-card-foreground">{strategy.name}</p>
-          <p className="text-[11px] text-muted-foreground">{strategy.exchange} · Running {strategy.daysRunning}d</p>
+          <p className="text-[11px] text-muted-foreground">{strategy.exchange} · Running {runningDays}d</p>
         </div>
       </div>
 
@@ -223,7 +230,7 @@ export function AiTradingManagement() {
     const [sd, id] = await Promise.all([sr.json(), ir.json()]);
     if (!sr.ok) throw new Error(sd.message || "Strategies failed");
     if (!ir.ok) throw new Error(id.message || "Investors failed");
-    const mappedStrategies: Strategy[] = (sd.strategies || []).map((s: any) => ({ id:s.strategy_id,name:s.name,exchange:s.exchange,minStake:Number(s.min_stake),lockDays:Number(s.lock_days),daysRunning:Number(s.days_running),totalRoi:Number(s.total_roi_pct),investors:Number(s.investor_count||0),totalStaked:Number(s.total_staked||0),todayRoi:s.today_roi_pct === null ? null : Number(s.today_roi_pct),todayTime:s.today_credit_at ? new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Dhaka",hour:"2-digit",minute:"2-digit"}).format(new Date(s.today_credit_at)) : null }));
+    const mappedStrategies: Strategy[] = (sd.strategies || []).map((s: any) => ({ id:s.strategy_id,name:s.name,exchange:s.exchange,minStake:Number(s.min_stake),lockDays:Number(s.lock_days),daysRunning:Number(s.days_running),createdAt:s.created_at,totalRoi:Number(s.total_roi_pct),investors:Number(s.investor_count||0),totalStaked:Number(s.total_staked||0),todayRoi:s.today_roi_pct === null ? null : Number(s.today_roi_pct),todayTime:s.today_credit_at ? new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Dhaka",hour:"2-digit",minute:"2-digit"}).format(new Date(s.today_credit_at)) : null }));
     const mappedInvestments: Investment[] = (id.investments || []).filter((x: any) => ["running","unlocked"].includes(x.status)).map((x: any) => ({ id:x.id,strategyId:x.strategy_id,name:`${x.user.first_name} ${x.user.last_name}`,email:x.user.email,invested:Number(x.amount),profit:Number(x.total_profit),startedAt:x.invested_at,lockDays:Number(x.lock_days),forceUnlocked:x.status === "unlocked" }));
     setStrategies(mappedStrategies);
     setInvestments(mappedInvestments);
