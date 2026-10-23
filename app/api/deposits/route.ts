@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
   const network = String(body?.network || "").trim();
   const transactionHash = String(body?.transactionHash || "").trim();
 
-  if (amount < 30) return bad("Minimum deposit amount is $30");
+  if (amount < 10) return bad("Minimum deposit amount is $10");
   if (!coin || !["USDT", "USDC"].includes(coin)) return bad("Invalid coin");
   if (!network || !["BEP20", "ERC20", "Aptos", "Polygon_POS", "Solana"].includes(network)) {
     return bad("Invalid network");
