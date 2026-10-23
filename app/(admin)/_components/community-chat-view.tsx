@@ -324,7 +324,7 @@ function MessageBubble({
         </div>
         {msg.replyText && <div className="mb-1 rounded border-l-2 border-primary bg-muted/60 px-2 py-1 text-left text-[11px]"><b>{msg.replyUsername || "Reply"}</b><p className="truncate">{msg.replyText}</p></div>}
         <div
-          className={`inline-block rounded-lg px-3 py-2 text-left text-sm leading-relaxed ${
+          className={`inline-block max-w-full whitespace-pre-wrap break-words rounded-lg px-3 py-2 text-left text-sm leading-relaxed ${
             admin
               ? "rounded-br-sm bg-foreground text-background"
               : "rounded-bl-sm border border-border bg-background text-foreground"

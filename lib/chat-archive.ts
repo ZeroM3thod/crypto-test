@@ -20,7 +20,9 @@ const archivePath = path.join(process.cwd(), "db", "chat-archive.json");
 
 export async function readChatArchive(): Promise<ArchivedChatMessage[]> {
   try {
-    const data = JSON.parse(await readFile(archivePath, "utf8"));
+    const contents = await readFile(archivePath, "utf8");
+    if (!contents.trim()) return [];
+    const data = JSON.parse(contents);
     return Array.isArray(data.messages) ? data.messages : [];
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
