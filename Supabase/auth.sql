@@ -259,6 +259,17 @@ create table if not exists public.referrals (
   unique(referrer_id, referred_id)
 );
 
+-- Keep each referred user linked to at most one referrer; retain the earliest link if duplicates exist.
+with duplicate_referrals as (
+  select id, row_number() over (partition by referred_id order by created_at, id) as position
+  from public.referrals
+)
+delete from public.referrals r
+using duplicate_referrals d
+where r.id = d.id and d.position > 1;
+
+create unique index if not exists referrals_referred_id_key on public.referrals (referred_id);
+
 -- Milestone configuration (admin-editable rewards)
 create table if not exists public.referral_milestones (
   id uuid primary key default gen_random_uuid(),

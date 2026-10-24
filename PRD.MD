@@ -1,56 +1,50 @@
-﻿Most likely the paste makes `onComplete` fire twice, and the second call overwrites the success with an error.
+﻿That's the bug. It comes from the referral insert in `verify-otp`, not from the code you pasted.
 
-1. The first request verifies the code and activates the account.
-2. The second request finds the account already `active` and returns `400 "This account is already verified"`.
-3. Your client treats any non-OK response as `setOtpStatus("error")`, so the UI shows "Wrong code, try again."
+`referrals?on_conflict=referred_id` tells Postgres to ignore duplicates on `referred_id`, but your `referrals` table has no unique constraint on that column. Postgres rejects the insert with `42P10`, which makes `verify-otp` return 500 and the UI show "Wrong code".
 
-Typing a code fires `onComplete` once, but pasting often triggers it from both the paste handler and the "6 digits filled" effect.
+The activation order makes it worse:
 
-**To confirm:** open DevTools, go to the Network tab, paste the code, and look for two `verify-otp` requests. The first returns 200 and the second returns 400.
+1. `updateUser` sets the account to `active`.
+2. The referral insert throws.
+3. The OTP is never consumed and no session is created.
+4. Every retry hits `"This account is already verified"`.
 
-**Fix in `app/signup/page.tsx`:**
+So any account that used a referral code is now active but stuck. Those users can sign in with their password.
 
-```tsx
-import { useRef } from "react"; // add to your react import
+**Fix 1: add the constraint (run in the Supabase SQL editor)**
 
-// inside SignUpWizardContent
-const verifyingRef = useRef(false);
+```sql
+-- check for duplicates first; if this returns rows, delete the extras before continuing
+select referred_id, count(*) from public.referrals group by referred_id having count(*) > 1;
 
-// OTPInput
-onComplete={async (raw) => {
-  const v = raw.replace(/\D/g, "");          // strip spaces/newlines from pasted text
-  if (v.length !== 6 || verifyingRef.current) return;
-  verifyingRef.current = true;
-  try {
-    const res = await fetch("/api/verify-otp", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, code: v }),
-    });
-    if (res.ok) {
-      localStorage.removeItem("pending_signup_email");
-      localStorage.removeItem("pending_signup_at");
-      setOtpStatus("success");
-      setTimeout(() => router.push("/dashboard"), 900);
-      return; // keep the lock after success
-    }
-    const data = await res.json().catch(() => null);
-    setOtpStatus("error");
-    if (res.status !== 400) setFormError(data?.message ?? "Verification failed. Try again.");
-  } catch {
-    setOtpStatus("error");
-    setFormError("Network error. Please try again.");
-  }
-  verifyingRef.current = false; // unlock only after a failure
-}}
+alter table public.referrals
+  add constraint referrals_referred_id_key unique (referred_id);
 ```
 
-This also stops every server failure from showing "Wrong code." Right now a 500 (for example, the `referrals` insert failing) looks the same as a bad code.
+**Fix 2: make a referral failure unable to block verification** (in `app/api/verify-otp/route.ts`)
 
-**Other things that cause this:**
+```ts
+const refCode = String(user.referral_code || "").trim();
+if (refCode) {
+  try {
+    const owners = await supabase<{ id: string }[]>(
+      `auth_users?select=id&or=(user_id.eq.${q(refCode)},referral_code.eq.${q(refCode)})&status=eq.active&limit=1`
+    );
+    if (owners[0] && owners[0].id !== user.id) {
+      await supabase("referrals?on_conflict=referred_id", {
+        method: "POST",
+        headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
+        body: JSON.stringify({ referrer_id: owners[0].id, referred_id: user.id }),
+      });
+    }
+  } catch (err) {
+    console.error("Referral link failed:", err); // don't fail signup over this
+  }
+}
+```
 
-- **Old code:** every resend or new signup invalidates earlier codes. Pasting from an older email fails, so use the newest one.
-- **Hidden characters:** the fix above strips whitespace, but if the `OTPInput` component only accepts digits on keypress, it may be rejecting the paste. If the fix doesn't help, send me `components/motion/otp-input.tsx` and I'll check its paste handling.
-- **Failed activation:** if the Network tab shows a single request returning 500, send me the response message.
+Also move `await verifyOtp(email, cleanCode.trim(), purpose, true)` to right after `updateUser`, before the referral block, so the code is consumed as soon as the account activates.
 
-What does the Network tab show when you paste?
+**Stuck accounts:** users who already hit this are active with no session, so they just need to sign in with their email and password. Their referral rows were never created. If you want those back, I can write a SQL backfill that inserts them from `auth_users.referral_code`.
+
+Do you want that backfill?
