@@ -434,7 +434,7 @@ export default function DashboardPage() {
       try {
         const res = await fetch('/api/dashboard');
         const data = await res.json();
-        setUserData(data);
+        setUserData({ ...data, selectedWallet: 'main' });
       } catch (err) {
         console.error('Dashboard load error:', err);
       } finally {
@@ -451,7 +451,7 @@ export default function DashboardPage() {
     return 'Good evening';
   };
 
-  const selectedWalletData = userData?.wallets.find(w => w.wallet === 'main');
+  const selectedWalletData = userData?.wallets.find(w => w.wallet === userData.selectedWallet);
   const walletAccounts = userData?.wallets.map(w => ({
     id: w.wallet,
     name: `${w.wallet.charAt(0).toUpperCase() + w.wallet.slice(1)} Wallet`,
