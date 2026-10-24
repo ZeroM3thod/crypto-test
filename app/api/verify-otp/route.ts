@@ -13,7 +13,7 @@ import {
 } from "@/lib/auth/backend";
 
 export async function POST(req: NextRequest) {
-  const { email: rawEmail, code } = await req.json().catch(() => ({}));
+  const { email: rawEmail, code, purpose: requestedPurpose } = await req.json().catch(() => ({}));
   const email = normalizeEmail(rawEmail);
   const cleanCode = String(code || "");
 
@@ -21,8 +21,9 @@ export async function POST(req: NextRequest) {
     await deleteExpiredPendingUsers();
     const existing = await findUserByEmail(email);
     if (!existing) return bad("No account found for this email.", 404);
-    if (existing.status !== "pending") return bad("This account is already verified. Use password reset if needed.", 400);
-    const purpose = "signup";
+    const purpose = requestedPurpose === "password_reset" ? "password_reset" : "signup";
+    if (purpose === "signup" && existing.status !== "pending") return bad("This account is already verified. Use password reset if needed.", 400);
+    if (purpose === "password_reset" && existing.status !== "active") return bad("This account cannot reset its password.", 400);
     // Verification can fail later while activating the account; don't consume the OTP until that succeeds.
     const user = await verifyOtp(email, cleanCode.trim(), purpose, false);
     if (!user) return bad("Invalid code.", 400);

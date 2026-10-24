@@ -226,7 +226,7 @@ export default function ForgotPasswordWizardPage() {
                 const res = await fetch("/api/verify-otp", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ email, code: v }),
+                  body: JSON.stringify({ email, code: v, purpose: "password_reset" }),
                 });
                 if (res.ok) {
                   setOtpStatus("success");
