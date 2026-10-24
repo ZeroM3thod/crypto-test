@@ -458,6 +458,10 @@ function SignUpWizardContent() {
                   localStorage.removeItem("pending_signup_email");
                   localStorage.removeItem("pending_signup_at");
                   router.push("/signin");
+                } else {
+                  setOtp("");
+                  setOtpStatus("idle");
+                  localStorage.setItem("pending_signup_at", String(Date.now()));
                 }
               }
             } catch { setFormError("Network error. Please try again."); }

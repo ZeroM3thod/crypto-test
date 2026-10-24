@@ -223,6 +223,11 @@ export async function sendOtp(email: string, code: string, purpose: OtpPurpose) 
 
 export async function createOtp(userId: string, email: string, purpose: OtpPurpose) {
   const code = code6();
+  await supabase(`auth_otps?user_id=eq.${q(userId)}&purpose=eq.${q(purpose)}&consumed_at=is.null`, {
+    method: "PATCH",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ consumed_at: new Date().toISOString() }),
+  });
   await supabase("auth_otps", {
     method: "POST",
     headers: { Prefer: "return=minimal" },

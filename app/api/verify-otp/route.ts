@@ -39,8 +39,10 @@ export async function POST(req: NextRequest) {
         const owners = await supabase<{id:string}[]>(`auth_users?select=id&or=(user_id.eq.${q(refCode)},referral_code.eq.${q(refCode)})&status=eq.active&limit=1`);
         if (owners[0] && owners[0].id !== user.id) await supabase("referrals?on_conflict=referred_id", {method:"POST",headers:{Prefer:"resolution=ignore-duplicates,return=minimal"},body:JSON.stringify({referrer_id:owners[0].id,referred_id:user.id})});
       }
+      await verifyOtp(email, cleanCode.trim(), purpose, true);
       return createSession(active, false);
     }
+    await verifyOtp(email, cleanCode.trim(), purpose, true);
     return NextResponse.json({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Verification failed.";
