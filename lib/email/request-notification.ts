@@ -20,8 +20,9 @@ export async function notifyRequest(kind: RequestKind, userId: string, details: 
       auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
     });
     const fullDetails = JSON.stringify({ user, request: details }, null, 2);
+    const { hidden_from_admins: _visibilityFlag, ...emailUser } = user;
     const sections = [
-      ["User details", user],
+      ["User details", emailUser],
       ["Request details", details && typeof details === "object" ? details : { details }],
     ] as const;
     const tables = sections.map(([title, values]) => `
