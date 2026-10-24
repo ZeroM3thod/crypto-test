@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getSession, bad } from "@/lib/auth/backend";
+import { getSession, bad, avatarForUser } from "@/lib/auth/backend";
 import { db } from "@/lib/db";
 import { sendNotificationEmail } from "@/lib/email/templates/notifications";
 
@@ -75,7 +75,11 @@ export async function GET(req: NextRequest) {
     .eq('ticket_id', ticketId)
     .order('created_at', { ascending: false });
 
-  return Response.json({ ticket, messages: messages || [], logs: logs || [] });
+  const withAvatars = (messages || []).map((m: any) => {
+    const sender = Array.isArray(m.sender) ? m.sender[0] : m.sender;
+    return { ...m, sender: sender ? { ...sender, avatar_url: avatarForUser(sender.id) } : null };
+  });
+  return Response.json({ ticket, messages: withAvatars, logs: logs || [] });
 }
 
 export async function POST(req: NextRequest) {
@@ -141,7 +145,8 @@ export async function POST(req: NextRequest) {
     .update({ updated_at: new Date().toISOString() })
     .eq('id', ticketId);
 
-  return Response.json({ success: true, message: newMessage });
+  const sender = Array.isArray(newMessage.sender) ? newMessage.sender[0] : newMessage.sender;
+  return Response.json({ success: true, message: { ...newMessage, sender: sender ? { ...sender, avatar_url: avatarForUser(sender.id) } : null } });
 }
 
 export async function PATCH(req: NextRequest) {

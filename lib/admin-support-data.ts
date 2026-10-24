@@ -6,6 +6,7 @@ export type TicketMessage = {
   id: string;
   from: "user" | "staff";
   staffName?: string;
+  avatarUrl?: string;
   message: string;
   created_at: string;
 };

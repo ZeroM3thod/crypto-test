@@ -92,14 +92,14 @@ export function Field({
   );
 }
 
-export function Avatar({ text, dark }: { text: string; dark?: boolean }) {
+export function Avatar({ text, dark, src }: { text: string; dark?: boolean; src?: string }) {
   return (
     <span
       className={`grid size-7 shrink-0 place-items-center rounded-full border border-border text-[10px] font-semibold ${
         dark ? "bg-foreground text-background" : "bg-muted text-foreground"
       }`}
     >
-      {text}
+      {src ? <img src={src} alt="" className="size-full rounded-full object-cover" /> : text}
     </span>
   );
 }

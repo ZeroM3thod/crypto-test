@@ -135,6 +135,7 @@ type DbMessage = {
     first_name: string;
     last_name: string;
     role: string;
+    avatar_url?: string;
   };
 };
 
@@ -211,6 +212,7 @@ export function SupportView() {
         id: m.id,
         from: m.sender.role === 'user' ? 'user' : 'staff',
         staffName: m.sender.role !== 'user' ? `${m.sender.first_name} ${m.sender.last_name}` : undefined,
+        avatarUrl: m.sender.avatar_url,
         message: m.message,
         created_at: m.created_at
       }));
@@ -501,7 +503,7 @@ export function SupportView() {
                             staff ? "flex-row-reverse" : ""
                           }`}
                         >
-                          <Avatar text={initials(name)} dark={staff} />
+                          <Avatar text={initials(name)} dark={staff} src={m.avatarUrl} />
                           <div
                             className={`flex max-w-[78%] flex-col ${
                               staff ? "items-end" : "items-start"
