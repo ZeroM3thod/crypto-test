@@ -486,6 +486,9 @@ function StrategyCard({
             +{strategy.roiPct.toFixed(1)}
             <span className="ml-0.5 text-xl font-medium">%</span>
           </p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Today’s ROI: <span className="font-semibold text-success">+{(strategy.todayRoiPct ?? 0).toFixed(1)}%</span>
+          </p>
         </div>
       </div>
 
