@@ -15,22 +15,27 @@ export async function GET(req: NextRequest) {
   const activeReferred = referrals.filter((ref) => ref.is_eligible === true).length;
 
   // Keep commission totals from the existing database aggregate.
-  const statsResult = await supabase<{ get_referral_stats: any }[]>(
-    `rpc/get_referral_stats?p_user_id=${q(user.id)}`
+  const commissions = await supabase<{ referred_id: string; source: string; commission_amount: number }[]>(
+    `referral_commissions?select=referred_id,source,commission_amount&referrer_id=eq.${q(user.id)}`
   );
-  const stats = statsResult[0]?.get_referral_stats || {
-    total_commission: 0,
-    commission_by_source: {},
-  };
+  const commissionBySource = commissions.reduce(
+    (totals, row) => {
+      totals[row.source] = (totals[row.source] || 0) + Number(row.commission_amount);
+      return totals;
+    },
+    {} as Record<string, number>,
+  );
+  const totalCommission = commissions.reduce((sum, row) => sum + Number(row.commission_amount), 0);
+  const commissionByUser = new Map<string, number>();
+  for (const row of commissions) {
+    commissionByUser.set(row.referred_id, (commissionByUser.get(row.referred_id) || 0) + Number(row.commission_amount));
+  }
 
   // Get commission per referred user
   const referredUsers = await Promise.all(
     referrals.map(async (ref) => {
       const refUser = ref.auth_users;
-      const commissions = await supabase<{ commission_amount: number }[]>(
-        `referral_commissions?select=commission_amount&referrer_id=eq.${q(user.id)}&referred_id=eq.${q(ref.referred_id)}`
-      );
-      const totalCommission = commissions.reduce((sum, c) => sum + Number(c.commission_amount), 0);
+      const totalCommission = commissionByUser.get(ref.referred_id) || 0;
 
       // Get total deposited (sum of deposit transactions)
       const deposits = await supabase<{ amount: number }[]>(
@@ -70,10 +75,10 @@ export async function GET(req: NextRequest) {
     stats: {
       totalReferred,
       activeReferred,
-      totalCommission: Number(stats.total_commission),
+      totalCommission,
       commissionBySource: {
-        daily: Number(stats.commission_by_source?.daily_profit || 0),
-        aiTrading: Number(stats.commission_by_source?.ai_trading || 0),
+        daily: commissionBySource.daily_profit || 0,
+        aiTrading: commissionBySource.ai_trading || 0,
       },
     },
     commissionRates,

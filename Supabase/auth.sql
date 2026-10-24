@@ -695,6 +695,11 @@ begin
   v_tx_hash := gen_random_uuid()::text;
   insert into public.wallet_transactions (user_id, wallet, type, amount, status, tx_hash)
   values (p_user_id, 'investment', 'daily_profit_cancel', v_total_return, 'completed', v_tx_hash);
+
+  -- Pay referral commission once, when the completed package profit is returned.
+  if v_investment.total_profit > 0 then
+    perform public.record_profit_with_commission(p_user_id, 'daily_profit', v_investment.total_profit);
+  end if;
 end;
 $$;
 
@@ -743,8 +748,6 @@ begin
     insert into public.wallet_transactions (user_id, wallet, type, amount, status, tx_hash)
     values (v_investment.user_id, 'investment', 'daily_profit_credit', v_investment.profit_per_cycle, 'completed', v_tx_hash);
 
-    -- Record profit event for referral commission
-    perform public.record_profit_with_commission(v_investment.user_id, 'daily_profit', v_investment.profit_per_cycle);
   end loop;
 end;
 $$;
@@ -970,10 +973,6 @@ begin
     p_trade_size, p_duration_minutes, p_pnl, v_result
   );
 
-  -- Record profit event for referral commission (only on gains)
-  if p_pnl > 0 then
-    perform public.record_profit_with_commission(v_investment.user_id, 'ai_trading', p_pnl);
-  end if;
 end;
 $$;
 
@@ -1014,6 +1013,11 @@ begin
   -- Create transaction record
   insert into public.wallet_transactions (user_id, wallet, type, amount, status, tx_hash)
   values (p_user_id, 'trading', 'ai_trading_withdraw', v_investment.current_value, 'completed', gen_random_uuid()::text);
+
+  -- Pay referral commission once, when the completed package profit is returned.
+  if v_investment.total_profit > 0 then
+    perform public.record_profit_with_commission(p_user_id, 'ai_trading', v_investment.total_profit);
+  end if;
 end;
 $$;
 
@@ -1200,11 +1204,6 @@ begin
         v_investment.id, v_investment.user_id, v_investment.strategy_id, v_investment.strategy_name,
         v_investment.current_value, 1440, v_profit_delta, case when v_profit_delta >= 0 then 'win' else 'loss' end
       );
-      
-      -- Record profit for referral commission (only on gains)
-      if v_profit_delta > 0 then
-        perform public.record_profit_with_commission(v_investment.user_id, 'ai_trading', v_profit_delta);
-      end if;
       
       v_total_credited := v_total_credited + v_profit_delta;
     end loop;
