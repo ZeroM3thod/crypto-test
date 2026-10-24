@@ -7,21 +7,21 @@ export async function GET(req: NextRequest) {
 
   const user = session.user;
 
-  // Get stats using DB function
-  const statsResult = await supabase<{ get_referral_stats: any }[]>(
-    `rpc/get_referral_stats?p_user_id=${q(user.id)}`
-  );
-  const stats = statsResult[0]?.get_referral_stats || {
-    total_referred: 0,
-    active_referred: 0,
-    total_commission: 0,
-    commission_by_source: {},
-  };
-
   // Get referred users list
   const referrals = await supabase<any[]>(
     `referrals?select=id,referred_id,is_eligible,first_deposit_at,created_at,auth_users!referrals_referred_id_fkey(id,user_id,first_name,last_name,email,created_at)&referrer_id=eq.${q(user.id)}&order=created_at.desc`
   );
+  const totalReferred = referrals.length;
+  const activeReferred = referrals.filter((ref) => ref.is_eligible === true).length;
+
+  // Keep commission totals from the existing database aggregate.
+  const statsResult = await supabase<{ get_referral_stats: any }[]>(
+    `rpc/get_referral_stats?p_user_id=${q(user.id)}`
+  );
+  const stats = statsResult[0]?.get_referral_stats || {
+    total_commission: 0,
+    commission_by_source: {},
+  };
 
   // Get commission per referred user
   const referredUsers = await Promise.all(
@@ -68,8 +68,8 @@ export async function GET(req: NextRequest) {
     referralCode,
     referralLink: `https://qouantex.com/join?ref=${referralCode}`,
     stats: {
-      totalReferred: stats.total_referred,
-      activeReferred: stats.active_referred,
+      totalReferred,
+      activeReferred,
       totalCommission: Number(stats.total_commission),
       commissionBySource: {
         daily: Number(stats.commission_by_source?.daily_profit || 0),
