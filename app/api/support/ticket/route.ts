@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getSession, bad } from "@/lib/auth/backend";
+import { getSession, bad, avatarForUser } from "@/lib/auth/backend";
 import { db } from "@/lib/db";
 
 export async function GET(req: NextRequest) {
@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
     return Response.json({ ticket, messages: [] });
   }
 
-  return Response.json({ ticket, messages });
+  return Response.json({ ticket, messages: (messages || []).map((m: any) => ({ ...m, sender: m.sender ? { ...m.sender, avatar_url: avatarForUser(m.sender.id) } : null })) });
 }
 
 export async function POST(req: NextRequest) {
@@ -97,5 +97,6 @@ export async function POST(req: NextRequest) {
     .update({ updated_at: new Date().toISOString() })
     .eq('id', ticketId);
 
-  return Response.json({ success: true, message: newMessage });
+  const sender = Array.isArray(newMessage.sender) ? newMessage.sender[0] : newMessage.sender;
+  return Response.json({ success: true, message: { ...newMessage, sender: sender ? { ...sender, avatar_url: avatarForUser(sender.id) } : null } });
 }

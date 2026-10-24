@@ -24,7 +24,7 @@ interface TicketMessage {
   message: string;
   created_at: string;
   // "user" | "admin" | "owner" | ... — anything that is not "user" is treated as staff
-  sender: { first_name: string; last_name: string; role: string };
+  sender: { first_name: string; last_name: string; role: string; avatar_url?: string };
 }
 
 interface Ticket {
@@ -108,6 +108,7 @@ export default function MyTicketsPage() {
                     first_name: m.sender?.role === "user" ? "You" : m.sender?.first_name || "Support",
                     last_name: m.sender?.role === "user" ? "" : m.sender?.last_name || "",
                     role: m.sender?.role || "admin",
+                    avatar_url: m.sender?.avatar_url,
                   },
                 })),
               }
@@ -273,9 +274,8 @@ export default function MyTicketsPage() {
                       <p className="py-8 text-center text-sm text-muted-foreground">No messages yet.</p>
                     ) : (
                       activeTicket.messages.map((m) => {
-                        // user = LEFT, anyone else (admin / owner / staff) = RIGHT
+                        // User messages right; support replies left.
                         const isUser = m.sender.role === "user";
-                        const isStaff = !isUser;
                         const initials =
                           ((m.sender.first_name?.[0] || "") + (m.sender.last_name?.[0] || "")).toUpperCase() || "?";
 
@@ -283,29 +283,29 @@ export default function MyTicketsPage() {
                           <div
                             key={m.id}
                             className={`flex max-w-[85%] items-end gap-2 ${
-                              isStaff ? "ml-auto flex-row-reverse self-end" : "mr-auto self-start"
+                              isUser ? "ml-auto flex-row-reverse self-end" : "mr-auto self-start"
                             }`}
                           >
                             <div
-                              className={`grid size-6 shrink-0 place-items-center rounded-full border text-[10px] font-semibold ${
-                                isStaff ? "border-foreground bg-foreground text-background" : "border-border"
+                              className={`grid size-6 shrink-0 place-items-center overflow-hidden rounded-full border text-[10px] font-semibold ${
+                                isUser ? "border-primary bg-primary text-primary-foreground" : "border-border"
                               }`}
                             >
-                              {initials}
+                              {m.sender.avatar_url ? <img src={m.sender.avatar_url} alt={`${m.sender.first_name} ${m.sender.last_name}`} className="size-full object-cover" /> : initials}
                             </div>
                             <div className="min-w-0">
                               <div
                                 className={`break-words rounded-lg px-3 py-2 text-sm leading-relaxed ${
-                                  isStaff
-                                    ? "rounded-br-sm bg-foreground text-background"
+                                  isUser
+                                    ? "rounded-br-sm bg-primary text-primary-foreground"
                                     : "rounded-bl-sm border border-border"
                                 }`}
                               >
                                 {m.message}
                               </div>
-                              <p className={`mt-1 text-[10px] text-muted-foreground ${isStaff ? "text-right" : "text-left"}`}>
+                              <p className={`mt-1 text-[10px] text-muted-foreground ${isUser ? "text-right" : "text-left"}`}>
                                 {formatTime(m.created_at)}
-                                {isStaff ? ` · ${m.sender.first_name} ${m.sender.last_name}`.trimEnd() : ""}
+                                {!isUser ? ` · ${m.sender.first_name} ${m.sender.last_name}`.trimEnd() : ""}
                               </p>
                             </div>
                           </div>
