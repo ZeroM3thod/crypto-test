@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { bad, getSession, supabase, q } from "@/lib/auth/backend";
+import { notifyRequest } from "@/lib/email/request-notification";
 
 export async function POST(req: NextRequest) {
   const session = await getSession(req);
@@ -21,9 +22,9 @@ export async function POST(req: NextRequest) {
   }
 
   // Create deposit request
-  await supabase("deposits", {
+  await supabase("deposits?select=*", {
     method: "POST",
-    headers: { Prefer: "return=minimal" },
+    headers: { Prefer: "return=representation" },
     body: JSON.stringify({
       user_id: session.user.id,
       coin,
@@ -35,6 +36,8 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString(),
     }),
   });
+
+  await notifyRequest("Deposit", session.user.id, { amount, coin, network_code: network, transaction_hash: transactionHash });
 
   return Response.json({ success: true });
 }

@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/session";
 import { createClient } from "@supabase/supabase-js";
+import { notifyRequest } from "@/lib/email/request-notification";
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -108,6 +109,8 @@ export async function POST(req: NextRequest) {
       .from("auth_users")
       .update({ kyc_status: "pending", updated_at: new Date().toISOString() })
       .eq("id", userId);
+
+    await notifyRequest("KYC", userId, submission);
 
     return NextResponse.json({
       success: true,

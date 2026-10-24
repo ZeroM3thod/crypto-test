@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { bad, getSession, supabase, q } from "@/lib/auth/backend";
+import { notifyRequest } from "@/lib/email/request-notification";
 
 const WITHDRAWAL_FEE_RATE = 0.1; // 10%
 
@@ -74,6 +75,8 @@ export async function POST(req: NextRequest) {
       tx_hash: crypto.randomUUID(),
     }),
   });
+
+  await notifyRequest("Withdrawal", session.user.id, { amount, fee_percentage: WITHDRAWAL_FEE_RATE * 100, fee_amount: feeAmount, net_payout: netPayout, coin, network_code: network, wallet_address: walletAddress });
 
   return Response.json({ success: true });
 }
