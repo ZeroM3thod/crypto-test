@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState, useEffect, Suspense } from "react";
+import { useCallback, useMemo, useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { User, Mail, Lock, Eye, EyeOff } from "lucide-react";
@@ -52,6 +52,7 @@ function SignUpWizardContent() {
   const [otp, setOtp] = useState("");
   const [otpStatus, setOtpStatus] = useState<OTPStatus>("idle");
   const [resendingOtp, setResendingOtp] = useState(false);
+  const verifyingOtpRef = useRef(false);
 
   const setCountryAndPrefix = (nextCountry: string) => {
     setCountry(nextCountry);
@@ -427,20 +428,31 @@ function SignUpWizardContent() {
                 setOtp(v);
                 if (otpStatus !== "idle") setOtpStatus("idle");
               }}
-              onComplete={async (v) => {
-                const res = await fetch("/api/verify-otp", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ email, code: v }),
-                });
-                if (res.ok) {
-                  localStorage.removeItem("pending_signup_email");
-                  localStorage.removeItem("pending_signup_at");
-                  setOtpStatus("success");
-                  setTimeout(() => router.push("/dashboard"), 900);
-                } else {
+              onComplete={async (raw) => {
+                const code = raw.replace(/\D/g, "");
+                if (code.length !== 6 || verifyingOtpRef.current) return;
+                verifyingOtpRef.current = true;
+                try {
+                  const res = await fetch("/api/verify-otp", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email, code }),
+                  });
+                  if (res.ok) {
+                    localStorage.removeItem("pending_signup_email");
+                    localStorage.removeItem("pending_signup_at");
+                    setOtpStatus("success");
+                    setTimeout(() => router.push("/dashboard"), 900);
+                    return;
+                  }
+                  const data = await res.json().catch(() => null);
                   setOtpStatus("error");
+                  if (res.status !== 400) setFormError(data?.message ?? "Verification failed. Try again.");
+                } catch {
+                  setOtpStatus("error");
+                  setFormError("Network error. Please try again.");
                 }
+                verifyingOtpRef.current = false;
               }}
             />
           </div>

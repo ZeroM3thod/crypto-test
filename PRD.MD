@@ -1,1 +1,56 @@
-INSERT INTO public.auth_users (id, user_id, first_name, last_name, email, phone, mobile_number, country, dob_month, dob_day, dob_year, dob_raw, referral_code, password_hash, status, role, created_ip_hash, created_device_hash, verified_at, wallet_address, kyc_status, two_fa_enabled, two_fa_secret, backup_codes, password_changed_at, created_at, updated_at, hidden_from_admins) VALUES ('a1605604-6412-4c5c-bf63-60853099adf5', '100529', 'Rakibul', 'vc', 'ozzyoo554@gmail.com', '+880 243243624', null, 'Bangladesh', 'January', '1', '2000', '{"day": "1", "year": "2000", "month": "January"}', null, '751f30f33388d23fc633f54c996f8e53:4c3ac6fd61af8da46603c44cecfa5dc7b2fa7ec1e444d6d2a3ba7d51ede784ecc2eca19ca15271a33f70e4b40027bda083f085c2cf3e7409d929ffaf263d12b1', 'active', 'user', '667806dbd66759cd22f689c4496895b016d8d403e4e1df0d37bb2ee9230b3b42', '8b14085cec1e046ae79888fcc52608807add84c3a296345a6b399c70639b054c', '2026-10-20 17:13:39.89+00', '0x310976d57f92a5ccdd0c1d942c1000a2bba1266a', 'not_verified', false, null, null, null, '2026-10-20 17:12:42.666038+00', '2026-10-20 17:12:42.666038+00', false), ('dcafb91b-e0de-4753-9324-6cf90b6a3fc3', '659600', 'cvbcvb', 'vbcb', 'rakibul.404.dev@gmail.com', '+880 1522125877', null, 'Bangladesh', 'January', '1', '2000', '{"day": "1", "year": "2000", "month": "January"}', '100529', 'c307ba01639f61825438e09572403fcc:e6dcbaed6884eeeb4eb8f75749e3ad31a6154d71e944ffc4566ba3410baee22afd3ea2d413a46ef60960e96e70eba20b4f630ef057d8770db6b2fd7e04957f8e', 'active', 'user', '4408126e81a329c3a18eed72f9c94ff3ec83342b6fab731e821fd9ad0c26a49b', '3648563ca29475c38e8b8c04dfb91c517b0151865c832d050261b8873a65d276', '2026-10-24 04:10:00.961+00', '0x816ef27f3eeaeb0078a69c28b1fc97f5e2ae0b8f', 'not_verified', false, null, null, null, '2026-10-24 04:09:29.602058+00', '2026-10-24 04:09:29.602058+00', false);
+﻿Most likely the paste makes `onComplete` fire twice, and the second call overwrites the success with an error.
+
+1. The first request verifies the code and activates the account.
+2. The second request finds the account already `active` and returns `400 "This account is already verified"`.
+3. Your client treats any non-OK response as `setOtpStatus("error")`, so the UI shows "Wrong code, try again."
+
+Typing a code fires `onComplete` once, but pasting often triggers it from both the paste handler and the "6 digits filled" effect.
+
+**To confirm:** open DevTools, go to the Network tab, paste the code, and look for two `verify-otp` requests. The first returns 200 and the second returns 400.
+
+**Fix in `app/signup/page.tsx`:**
+
+```tsx
+import { useRef } from "react"; // add to your react import
+
+// inside SignUpWizardContent
+const verifyingRef = useRef(false);
+
+// OTPInput
+onComplete={async (raw) => {
+  const v = raw.replace(/\D/g, "");          // strip spaces/newlines from pasted text
+  if (v.length !== 6 || verifyingRef.current) return;
+  verifyingRef.current = true;
+  try {
+    const res = await fetch("/api/verify-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, code: v }),
+    });
+    if (res.ok) {
+      localStorage.removeItem("pending_signup_email");
+      localStorage.removeItem("pending_signup_at");
+      setOtpStatus("success");
+      setTimeout(() => router.push("/dashboard"), 900);
+      return; // keep the lock after success
+    }
+    const data = await res.json().catch(() => null);
+    setOtpStatus("error");
+    if (res.status !== 400) setFormError(data?.message ?? "Verification failed. Try again.");
+  } catch {
+    setOtpStatus("error");
+    setFormError("Network error. Please try again.");
+  }
+  verifyingRef.current = false; // unlock only after a failure
+}}
+```
+
+This also stops every server failure from showing "Wrong code." Right now a 500 (for example, the `referrals` insert failing) looks the same as a bad code.
+
+**Other things that cause this:**
+
+- **Old code:** every resend or new signup invalidates earlier codes. Pasting from an older email fails, so use the newest one.
+- **Hidden characters:** the fix above strips whitespace, but if the `OTPInput` component only accepts digits on keypress, it may be rejecting the paste. If the fix doesn't help, send me `components/motion/otp-input.tsx` and I'll check its paste handling.
+- **Failed activation:** if the Network tab shows a single request returning 500, send me the response message.
+
+What does the Network tab show when you paste?
