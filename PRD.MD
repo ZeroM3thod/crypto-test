@@ -1,50 +1,33 @@
-﻿That's the bug. It comes from the referral insert in `verify-otp`, not from the code you pasted.
-
-`referrals?on_conflict=referred_id` tells Postgres to ignore duplicates on `referred_id`, but your `referrals` table has no unique constraint on that column. Postgres rejects the insert with `42P10`, which makes `verify-otp` return 500 and the UI show "Wrong code".
-
-The activation order makes it worse:
-
-1. `updateUser` sets the account to `active`.
-2. The referral insert throws.
-3. The OTP is never consumed and no session is created.
-4. Every retry hits `"This account is already verified"`.
-
-So any account that used a referral code is now active but stuck. Those users can sign in with their password.
-
-**Fix 1: add the constraint (run in the Supabase SQL editor)**
-
-```sql
--- check for duplicates first; if this returns rows, delete the extras before continuing
-select referred_id, count(*) from public.referrals group by referred_id having count(*) > 1;
-
-alter table public.referrals
-  add constraint referrals_referred_id_key unique (referred_id);
-```
-
-**Fix 2: make a referral failure unable to block verification** (in `app/api/verify-otp/route.ts`)
-
-```ts
-const refCode = String(user.referral_code || "").trim();
-if (refCode) {
-  try {
-    const owners = await supabase<{ id: string }[]>(
-      `auth_users?select=id&or=(user_id.eq.${q(refCode)},referral_code.eq.${q(refCode)})&status=eq.active&limit=1`
-    );
-    if (owners[0] && owners[0].id !== user.id) {
-      await supabase("referrals?on_conflict=referred_id", {
-        method: "POST",
-        headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
-        body: JSON.stringify({ referrer_id: owners[0].id, referred_id: user.id }),
-      });
-    }
-  } catch (err) {
-    console.error("Referral link failed:", err); // don't fail signup over this
-  }
-}
-```
-
-Also move `await verifyOtp(email, cleanCode.trim(), purpose, true)` to right after `updateUser`, before the referral block, so the code is consumed as soon as the account activates.
-
-**Stuck accounts:** users who already hit this are active with no session, so they just need to sign in with their email and password. Their referral rows were never created. If you want those back, I can write a SQL backfill that inserts them from `auth_users.referral_code`.
-
-Do you want that backfill?
+﻿rowser] ObjectMultiplex - orphaned data for stream "metamask-multichain-provider" (moz-extension://fe1c432f-10b4-41ec-88a1-1a73446c4c64/scripts/inpage.js;:1:36689)
+[browser] ObjectMultiplex - orphaned data for stream "metamask-multichain-provider" (moz-extension://fe1c432f-10b4-41ec-88a1-1a73446c4c64/scripts/inpage.js;:1:36689)
+ GET /api/profile 200 in 272ms (next.js: 27ms, application-code: 245ms)
+ GET /api/user/role 200 in 277ms (next.js: 52ms, application-code: 224ms)
+ GET /api/fund/received 200 in 310ms (next.js: 12ms, application-code: 298ms)
+ GET /api/deposits 200 in 421ms (next.js: 76ms, application-code: 345ms)
+ GET /api/profile 200 in 175ms (next.js: 14ms, application-code: 162ms)
+ GET /api/user/role 200 in 151ms (next.js: 10ms, application-code: 141ms)
+ GET /api/fund/received 200 in 304ms (next.js: 11ms, application-code: 293ms)
+ GET /api/deposits 200 in 455ms (next.js: 8ms, application-code: 447ms)
+ GET /api/fund/received 200 in 288ms (next.js: 6ms, application-code: 281ms)
+ GET /api/fund/received 200 in 305ms (next.js: 15ms, application-code: 290ms)
+ GET /api/fund/received 200 in 298ms (next.js: 6ms, application-code: 292ms)
+ GET /api/fund/received 200 in 286ms (next.js: 6ms, application-code: 280ms)
+ GET /api/fund/received 200 in 318ms (next.js: 7ms, application-code: 310ms)
+Deposit notification email failed: Error: {"code":"22P02","details":null,"hint":null,"message":"invalid input syntax for type uuid: \"100529\""}
+    at supabase (lib\auth\backend.ts:61:22)
+    at async notifyRequest (lib\email\request-notification.ts:11:19)
+    at async POST (app\api\deposits\route.ts:40:3)
+  59 |     headers: supabaseHeaders(init.headers),
+  60 |   });
+> 61 |   if (!res.ok) throw new Error(await res.text());
+     |                      ^
+  62 |   const text = await res.text();
+  63 |   if (!text) return null as T;
+  64 |   return JSON.parse(text) as T;
+ POST /api/deposits 200 in 870ms (next.js: 6ms, application-code: 864ms)
+ GET /api/deposits 200 in 294ms (next.js: 6ms, application-code: 288ms)
+ GET /api/fund/received 200 in 300ms (next.js: 12ms, application-code: 288ms)
+ GET /api/fund/received 200 in 283ms (next.js: 11ms, application-code: 272ms)
+ GET /api/fund/received 200 in 297ms (next.js: 12ms, application-code: 285ms)
+ GET /api/fund/received 200 in 277ms (next.js: 5ms, application-code: 273ms)
+ GET 

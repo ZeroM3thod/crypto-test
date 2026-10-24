@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Create deposit request
-  await supabase("deposits?select=*", {
+  const created = await supabase<any[]>("deposits?select=*", {
     method: "POST",
     headers: { Prefer: "return=representation" },
     body: JSON.stringify({
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     }),
   });
 
-  await notifyRequest("Deposit", session.user.id, { amount, coin, network_code: network, transaction_hash: transactionHash });
+  await notifyRequest("Deposit", session.user.user_id || session.user.id, created?.[0] || { amount, coin, network_code: network, transaction_hash: transactionHash });
 
   return Response.json({ success: true });
 }
