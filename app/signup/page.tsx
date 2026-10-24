@@ -184,6 +184,11 @@ function SignUpWizardContent() {
           setSubmitting(false);
           return;
         }
+        const response = await res.json().catch(() => null);
+        if (response?.verified) {
+          router.push("/signin");
+          return;
+        }
         localStorage.setItem("pending_signup_email", email.trim().toLowerCase());
         localStorage.setItem("pending_signup_at", String(Date.now()));
         setSubmitting(false);
@@ -447,6 +452,13 @@ function SignUpWizardContent() {
               if (!res.ok) {
                 const data = await res.json().catch(() => null);
                 setFormError(data?.message || (res.status === 429 ? "Too many resend requests. Try again after 12 hours." : "Could not resend code."));
+              } else {
+                const data = await res.json().catch(() => null);
+                if (data?.verified) {
+                  localStorage.removeItem("pending_signup_email");
+                  localStorage.removeItem("pending_signup_at");
+                  router.push("/signin");
+                }
               }
             } catch { setFormError("Network error. Please try again."); }
             finally { setResendingOtp(false); }

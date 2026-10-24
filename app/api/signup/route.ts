@@ -65,7 +65,8 @@ export async function PUT(req: NextRequest) {
     const { ipHash, deviceHash } = await assertRateLimit(req, "signup", device.id, 3);
     const email = normalizeEmail(body?.email);
     const user = await findUserByEmail(email);
-    if (!user || user.status !== "pending") return setDeviceCookie(bad("No pending signup found.", 404), device.id);
+    if (user?.status === "active") return setDeviceCookie(NextResponse.json({ ok: true, verified: true }), device.id);
+    if (!user || user.status !== "pending") return setDeviceCookie(bad("No pending signup found. Start signup again.", 404), device.id);
     await createOtp(user.id, email, "signup");
     await recordFailedAuthAttempt("signup", ipHash, deviceHash);
     return setDeviceCookie(NextResponse.json({ ok: true }), device.id);
