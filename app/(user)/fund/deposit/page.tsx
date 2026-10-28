@@ -241,7 +241,7 @@ export default function DepositPage() {
       const res = await fetch("/api/deposits");
       if (res.ok) {
         const data = await res.json();
-        setHistory(data.deposits || []);
+        setHistory((data.deposits || []).map((d: any) => ({ ...d, asset: d.asset ?? d.coin ?? "" })));
       }
     } catch (err) {
       console.error("Failed to fetch deposit history:", err);
